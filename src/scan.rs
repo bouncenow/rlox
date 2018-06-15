@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::HashMap;
 
 use util::ErrorWithPartialResult;
@@ -9,10 +8,16 @@ pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
     pub line: usize,
-    pub literal: Option<Box<Any>>
+    pub literal: Option<TokenLiteralValue>
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
+pub enum TokenLiteralValue {
+    Double(f64),
+    String(String),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
     LeftParen, RightParen,
     LeftBrace, RightBrace,
@@ -85,12 +90,19 @@ impl ScannerState {
     }
 
     fn scan_tokens(mut self) -> Result<Vec<Token>, ErrorWithPartialResult<Vec<Token>>> {
-        println!("Scanning!");
-
         while !self.check_if_at_end() {
             self.sync_start_current();
             self.scan_token();
         }
+
+        self.tokens.push(
+            Token {
+                token_type: TokenType::Eof,
+                lexeme: "".to_string(),
+                line: self.line,
+                literal: None
+            }
+        );
 
         if self.errors.is_empty() {
             Ok(self.tokens)
@@ -211,7 +223,7 @@ impl ScannerState {
         self.advance();
 
         let str_value = self.get_source_substring(self.start + 1, self.current - 1);
-        self.add_token_with_literal(TokenType::String, Some(Box::new(str_value)))
+        self.add_token_with_literal(TokenType::String, Some(TokenLiteralValue::String(str_value)))
     }
 
     fn number(&mut self) {
@@ -230,7 +242,7 @@ impl ScannerState {
 
         let num_val: f64 = self.get_current_lexeme().parse()
             .expect("Wrongly parsed position of double!");
-        self.add_token_with_literal(TokenType::Number, Some(Box::new(num_val)));
+        self.add_token_with_literal(TokenType::Number, Some(TokenLiteralValue::Double(num_val)));
     }
 
     fn is_option_digit(c: Option<char>) -> bool {
@@ -294,7 +306,7 @@ impl ScannerState {
         self.add_token_with_literal(token_type, None);
     }
 
-    fn add_token_with_literal(&mut self, token_type: TokenType, literal: Option<Box<Any>>) {
+    fn add_token_with_literal(&mut self, token_type: TokenType, literal: Option<TokenLiteralValue>) {
         let lexeme = self.get_current_lexeme();
         self.tokens.push(
             Token {

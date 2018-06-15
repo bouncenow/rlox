@@ -4,8 +4,12 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::process;
+use std::io::{self, BufRead};
+use std::io::Write;
 
 use rlox::scan;
+use rlox::parse;
+use rlox::util;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -32,7 +36,7 @@ fn parse_args_for_running_mode(args: &Vec<String>) -> Result<RunningMode, &'stat
         return Err("Usage: rlox [script]")
     }
 
-    if args.len() > 0 {
+    if args.len() > 1 {
         let script_file_name = args[1].clone();
         Ok(RunningMode::Script(script_file_name))
     } else {
@@ -53,9 +57,41 @@ fn run_file(file_name: String) {
     println!("Interpreting file:\n{}", source);
     let tokens = scan::scan_tokens(&source)
         .unwrap_or_else(|_| process::exit(1));
-    println!("{:#?}", tokens);
+    let expr = parse::parse(&tokens)
+        .unwrap_or_else(|_| process::exit(1));
+    println!("Parsed: {:#?}", util::pretty_print(&expr));
 }
 
 fn run_repl() {
-    println!("Running REPL!");
+    println!("Rlox REPL!");
+    loop {
+        run_line()
+    }
+}
+
+fn run_line() {
+    println!();
+    print!("> ");
+    io::stdout().flush()
+        .expect("Problem with stdout");
+    let mut line = String::new();
+    let stdin = io::stdin();
+    stdin.lock().read_line(&mut line).expect("Couldn't read line");
+    let scan_result = scan::scan_tokens(&line);
+    match scan_result {
+        Ok(tokens) => {
+            let parse_result = parse::parse(&tokens);
+            match parse_result {
+                Ok(expr) => {
+                    println!("Result: {}", util::pretty_print(&expr));
+                },
+                Err(err) => {
+                    println!("Parse error: {:#?}", err);
+                }
+            }
+        }
+        Err(err) => {
+            println!("Scanning error: {:#?}", err);
+        }
+    }
 }
