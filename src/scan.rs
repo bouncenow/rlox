@@ -177,7 +177,10 @@ impl ScannerState {
             }
             '/' => {
                 if self.match_next('/') {
-                    while let Some(_) = self.peek() {
+                    while let Some(c) = self.peek() {
+                        if c == '\n' {
+                            break;
+                        }
                         self.advance();
                     }
                 } else {
