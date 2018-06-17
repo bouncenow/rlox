@@ -65,7 +65,6 @@ fn run_file(file_name: String) {
             process::exit(1)
         });
 
-    println!("Statements: {:#?}", program);
     let mut interpreter = Interpreter::new();
     interpreter.execute(&program);
 }
