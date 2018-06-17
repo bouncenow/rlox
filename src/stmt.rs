@@ -1,6 +1,7 @@
 use expression::*;
 use scan::Token;
 
+#[derive(Debug)]
 pub enum Stmt {
     Expression { expr: Expr },
     Print { expr: Expr },

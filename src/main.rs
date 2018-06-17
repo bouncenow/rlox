@@ -64,6 +64,8 @@ fn run_file(file_name: String) {
             println!("Parsing error: {}", e);
             process::exit(1)
         });
+
+    println!("Statements: {:#?}", program);
     let mut interpreter = Interpreter::new();
     interpreter.execute(&program);
 }

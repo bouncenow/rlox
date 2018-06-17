@@ -1,5 +1,2 @@
-var a = 1;
-
-if (a > 0) {
-    print "then";
-}
+print "hi" or 2; // "hi".
+print nil or "yes"; // "yes".

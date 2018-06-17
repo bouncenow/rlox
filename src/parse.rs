@@ -135,7 +135,7 @@ impl<'a> ParserState<'a> {
     }
 
     fn assignment(&mut self) -> ResExpr {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.match_next_one(TokenType::Equal) {
             let value = self.assignment()?;
@@ -148,6 +148,30 @@ impl<'a> ParserState<'a> {
         }
 
         return Ok(expr);
+    }
+
+    fn or(&mut self) -> ResExpr {
+        let mut expr = self.and()?;
+
+        while self.match_next_one(TokenType::Or) {
+            let operator = self.previous();
+            let right = self.and()?;
+            expr = Expr::Logical {left: Box::new(expr), operator, right: Box::new(right)};
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> ResExpr {
+        let mut expr = self.equality()?;
+
+        while self.match_next_one(TokenType::And) {
+            let operator = self.previous();
+            let right = self.equality()?;
+            expr = Expr::Logical {left: Box::new(expr), operator, right: Box::new(right)};
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> ResExpr {

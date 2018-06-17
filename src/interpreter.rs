@@ -238,6 +238,22 @@ impl Interpreter {
                 Rc::get_mut(&mut self.env).unwrap().assign(name.clone(), value.clone())?;
                 Ok(value.clone())
             }
+
+            Expr::Logical {left, operator, right} => {
+                let left = self.evaluate(&left)?;
+
+                if operator.token_type == TokenType::Or {
+                    if is_truthy(&left) {
+                        return Ok(left)
+                    }
+                } else {
+                    if !is_truthy(&left) {
+                        return Ok(left)
+                    }
+                }
+
+                self.evaluate(&right)
+            }
         }
     }
 }
