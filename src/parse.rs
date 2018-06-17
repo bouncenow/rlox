@@ -1,21 +1,8 @@
 use scan::*;
+use expression::Expr;
+use expression::ExprVal;
+use stmt::Stmt;
 use util::RloxError;
-
-#[derive(Debug)]
-pub enum Expr<'a> {
-    Binary { left: Box<Expr<'a>>, operator: &'a Token, right: Box<Expr<'a>> },
-    Unary { operator: &'a Token, right: Box<Expr<'a>> },
-    Literal { value: ExprLiteralValue },
-    Grouping { expr: Box<Expr<'a>> },
-}
-
-#[derive(Debug)]
-pub enum ExprLiteralValue {
-    String(String),
-    Double(f64),
-    Boolean(bool),
-    Nil
-}
 
 struct ParserState<'a> {
     tokens: &'a Vec<Token>,
@@ -23,12 +10,19 @@ struct ParserState<'a> {
     current: usize,
 }
 
-pub fn parse(tokens: &Vec<Token>) -> Result<Expr, RloxError> {
+pub fn parse_for_expression(tokens: &Vec<Token>) -> Result<Expr, RloxError> {
     let parser_state = ParserState::new(tokens);
     parser_state.parse_expression()
 }
 
-type Res<'b> = Result<Expr<'b>, RloxError>;
+pub fn parse(tokens: &Vec<Token>) -> Result<Vec<Stmt>, RloxError> {
+    let parser_state = ParserState::new(tokens);
+    parser_state.parse()
+}
+
+type ResExpr<'a> = Result<Expr, RloxError>;
+type ResStmt<'a> = Result<Stmt, RloxError>;
+type ResListStmt<'a> = Result<Vec<Stmt>, RloxError>;
 
 impl<'a> ParserState<'a> {
     fn new(tokens: &'a Vec<Token>) -> ParserState {
@@ -39,15 +33,107 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    fn parse_expression(mut self) -> Res<'a> {
+    fn parse(mut self) -> ResListStmt<'a> {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.is_at_end() {
+            match self.declaration() {
+                Ok(stmt) => statements.push(stmt),
+                Err(e) => return Err(e)
+            }
+        }
+
+        Ok(statements)
+    }
+
+    fn declaration(&mut self) -> ResStmt<'a> {
+        if self.match_next_one(TokenType::Var) {
+            let decl_result = self.var_declaration();
+            if let Err(_) = &decl_result {
+                self.synchronize();
+            }
+            return decl_result;
+        }
+
+        let statement_result = self.statement();
+        if let Err(_) = &statement_result {
+            self.synchronize();
+        }
+        statement_result
+    }
+
+    fn var_declaration(&mut self) -> ResStmt<'a> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
+
+        let initializer = if self.match_next_one(TokenType::Equal) {
+            let expr = self.expression()?;
+            Some(expr)
+        } else {
+            None
+        };
+
+        self.consume(TokenType::Semicolon, "Expect semicolon after variable declaration")?;
+        Ok(Stmt::Var { name, initializer })
+    }
+
+    fn statement(&mut self) -> ResStmt<'a> {
+        if self.match_next_one(TokenType::Print) {
+            return self.print_statement();
+        } else if self.match_next_one(TokenType::LeftBrace) {
+            let block = self.block()?;
+            return Ok(Stmt::Block { statements: block });
+        }
+
+        self.expression_statement()
+    }
+
+    fn block(&mut self) -> ResListStmt<'a> {
+        let mut statements = Vec::new();
+
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            statements.push(self.declaration()?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
+        Ok(statements)
+    }
+
+    fn print_statement(&mut self) -> ResStmt<'a> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after print statement.")?;
+        Ok(Stmt::Print { expr })
+    }
+
+    fn expression_statement(&mut self) -> ResStmt<'a> {
+        let expr = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+        Ok(Stmt::Expression { expr })
+    }
+
+    fn parse_expression(mut self) -> ResExpr<'a> {
         self.expression()
     }
 
-    fn expression(&mut self) -> Res<'a> {
-        self.equality()
+    fn expression(&mut self) -> ResExpr<'a> {
+        self.assignment()
     }
 
-    fn equality(&mut self) -> Res<'a> {
+    fn assignment(&mut self) -> ResExpr<'a> {
+        let expr = self.equality()?;
+
+        if self.match_next_one(TokenType::Equal) {
+            let value = self.assignment()?;
+
+            return if let Expr::Variable { name } = expr {
+                Ok(Expr::Assign { name, value: Box::new(value) })
+            } else {
+                Err(RloxError::new("Invalid assignment target".to_string()))
+            };
+        }
+
+        return Ok(expr);
+    }
+
+    fn equality(&mut self) -> ResExpr<'a> {
         let mut expr = self.comparison()?;
 
         while self.match_next(&[TokenType::BangEqual, TokenType::EqualEqual]) {
@@ -63,7 +149,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Res<'a> {
+    fn comparison(&mut self) -> ResExpr<'a> {
         let mut expr = self.addition()?;
 
         while self.match_next(&[TokenType::Greater, TokenType::GreaterEqual, TokenType::Less, TokenType::LessEqual]) {
@@ -79,7 +165,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn addition(&mut self) -> Res<'a> {
+    fn addition(&mut self) -> ResExpr<'a> {
         let mut expr = self.multiplication()?;
 
         while self.match_next(&[TokenType::Plus, TokenType::Minus]) {
@@ -95,7 +181,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn multiplication(&mut self) -> Res<'a> {
+    fn multiplication(&mut self) -> ResExpr<'a> {
         let mut expr = self.unary()?;
 
         while self.match_next(&[TokenType::Star, TokenType::Slash]) {
@@ -111,7 +197,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Res<'a> {
+    fn unary(&mut self) -> ResExpr<'a> {
         if self.match_next(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
@@ -124,22 +210,22 @@ impl<'a> ParserState<'a> {
         self.primary()
     }
 
-    fn primary(&mut self) -> Res<'a> {
+    fn primary(&mut self) -> ResExpr<'a> {
         if self.match_next_one(TokenType::False) {
-            return Ok(Expr::Literal { value: ExprLiteralValue::Boolean(false) });
+            return Ok(Expr::Literal { value: ExprVal::Boolean(false) });
         }
         if self.match_next_one(TokenType::True) {
-            return Ok(Expr::Literal { value: ExprLiteralValue::Boolean(true) });
+            return Ok(Expr::Literal { value: ExprVal::Boolean(true) });
         }
         if self.match_next_one(TokenType::Nil) {
-            return Ok(Expr::Literal { value: ExprLiteralValue::Nil });
+            return Ok(Expr::Literal { value: ExprVal::Nil });
         }
 
         if self.match_next(&[TokenType::Number, TokenType::String]) {
             let token_literal = self.previous().literal.clone();
             return match token_literal {
-                Some(TokenLiteralValue::Double(d)) => Ok(Expr::Literal {value: ExprLiteralValue::Double(d)}),
-                Some(TokenLiteralValue::String(s)) => Ok(Expr::Literal {value: ExprLiteralValue::String(s)}),
+                Some(TokenLiteralValue::Double(d)) => Ok(Expr::Literal { value: ExprVal::Double(d) }),
+                Some(TokenLiteralValue::String(s)) => Ok(Expr::Literal { value: ExprVal::String(s) }),
                 _ => panic!("Illegally scanned token")
             };
         }
@@ -150,10 +236,34 @@ impl<'a> ParserState<'a> {
             return Ok(Expr::Grouping { expr: Box::new(expr) });
         }
 
+        if self.match_next_one(TokenType::Identifier) {
+            return Ok(Expr::Variable { name: self.previous().clone() });
+        }
+
         Err(RloxError::new("Expect expression".to_string()))
     }
 
-    fn consume(&mut self, token_type: TokenType, error_message: &str) -> Result<&'a Token, RloxError> {
+    fn synchronize(&mut self) {
+        self.advance();
+
+        while !self.is_at_end() {
+            if self.previous().token_type == TokenType::Semicolon {
+                return;
+            }
+
+            match self.peek().token_type {
+                TokenType::Class | TokenType::Fun | TokenType::Var | TokenType::For | TokenType::If
+                | TokenType::While | TokenType::Print | TokenType::Return => {
+                    return;
+                }
+                _ => {}
+            }
+
+            self.advance();
+        }
+    }
+
+    fn consume(&mut self, token_type: TokenType, error_message: &str) -> Result<Token, RloxError> {
         if self.check(token_type) {
             Ok(self.advance())
         } else {
@@ -189,7 +299,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    fn advance(&mut self) -> &'a Token {
+    fn advance(&mut self) -> Token {
         if !self.is_at_end() {
             self.current += 1;
         }
@@ -197,8 +307,8 @@ impl<'a> ParserState<'a> {
         self.previous()
     }
 
-    fn previous(&self) -> &'a Token {
-        &self.tokens[self.current - 1]
+    fn previous(&self) -> Token {
+        self.tokens[self.current - 1].clone()
     }
 
     fn is_at_end(&self) -> bool {

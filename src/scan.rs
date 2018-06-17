@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use util::ErrorWithPartialResult;
 use util::RloxError;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,

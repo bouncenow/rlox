@@ -9,7 +9,7 @@ use std::io::Write;
 
 use rlox::scan;
 use rlox::parse;
-use rlox::util;
+use rlox::interpreter::Interpreter;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -54,22 +54,29 @@ fn run_file(file_name: String) {
         println!("Unable to read script file: {}", err);
         process::exit(2);
     });
-    println!("Interpreting file:\n{}", source);
     let tokens = scan::scan_tokens(&source)
-        .unwrap_or_else(|_| process::exit(1));
-    let expr = parse::parse(&tokens)
-        .unwrap_or_else(|_| process::exit(1));
-    println!("Parsed: {:#?}", util::pretty_print(&expr));
+        .unwrap_or_else(|e| {
+            println!("Scanning error: {}", e.error);
+            process::exit(1)
+        });
+    let program = parse::parse(&tokens)
+        .unwrap_or_else(|e| {
+            println!("Parsing error: {}", e);
+            process::exit(1)
+        });
+    let mut interpreter = Interpreter::new();
+    interpreter.execute(&program);
 }
 
 fn run_repl() {
     println!("Rlox REPL!");
+    let mut interpreter = Interpreter::new();
     loop {
-        run_line()
+        run_line(&mut interpreter)
     }
 }
 
-fn run_line() {
+fn run_line(interpreter: &mut Interpreter) {
     println!();
     print!("> ");
     io::stdout().flush()
@@ -80,13 +87,23 @@ fn run_line() {
     let scan_result = scan::scan_tokens(&line);
     match scan_result {
         Ok(tokens) => {
-            let parse_result = parse::parse(&tokens);
-            match parse_result {
-                Ok(expr) => {
-                    println!("Result: {}", util::pretty_print(&expr));
-                },
-                Err(err) => {
-                    println!("Parse error: {:#?}", err);
+            let parse_as_statements_res = parse::parse(&tokens);
+            match parse_as_statements_res {
+                Ok(ref statements) => interpreter.execute(statements),
+                Err(_) => {
+                    let parse_result = parse::parse_for_expression(&tokens);
+                    match parse_result {
+                        Ok(expr) => {
+                            let result = interpreter.evaluate(&expr);
+                            match result {
+                                Ok(expr_val) => println!("Result: {}", expr_val),
+                                Err(e) => println!("Runtime error: {}", e)
+                            };
+                        },
+                        Err(err) => {
+                            println!("Parse error: {:#?}", err);
+                        }
+                    }
                 }
             }
         }
