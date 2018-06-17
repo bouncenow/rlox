@@ -1,2 +1,5 @@
-print "hi" or 2; // "hi".
-print nil or "yes"; // "yes".
+var a = 1;
+
+while (a < 5) a = a + 1;
+
+print a;

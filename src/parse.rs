@@ -83,6 +83,8 @@ impl<'a> ParserState<'a> {
             return Ok(Stmt::Block { statements: block });
         } else if self.match_next_one(TokenType::If) {
             return self.if_statement();
+        } else if self.match_next_one(TokenType::While) {
+            return self.while_statement();
         }
 
         self.expression_statement()
@@ -123,7 +125,16 @@ impl<'a> ParserState<'a> {
             None
         };
 
-        Ok(Stmt::If {condition, then_branch: Box::new(then_branch), else_branch})
+        Ok(Stmt::If { condition, then_branch: Box::new(then_branch), else_branch })
+    }
+
+    fn while_statement(&mut self) -> ResStmt {
+        self.consume(TokenType::LeftParen, "Expect '(' after while.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect ')' after while condition.")?;
+        let body = self.statement()?;
+
+        Ok(Stmt::While { condition: Box::new(condition), body: Box::new(body) })
     }
 
     fn parse_expression(mut self) -> ResExpr {
@@ -156,7 +167,7 @@ impl<'a> ParserState<'a> {
         while self.match_next_one(TokenType::Or) {
             let operator = self.previous();
             let right = self.and()?;
-            expr = Expr::Logical {left: Box::new(expr), operator, right: Box::new(right)};
+            expr = Expr::Logical { left: Box::new(expr), operator, right: Box::new(right) };
         }
 
         Ok(expr)
@@ -168,7 +179,7 @@ impl<'a> ParserState<'a> {
         while self.match_next_one(TokenType::And) {
             let operator = self.previous();
             let right = self.equality()?;
-            expr = Expr::Logical {left: Box::new(expr), operator, right: Box::new(right)};
+            expr = Expr::Logical { left: Box::new(expr), operator, right: Box::new(right) };
         }
 
         Ok(expr)
