@@ -20,9 +20,9 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Vec<Stmt>, RloxError> {
     parser_state.parse()
 }
 
-type ResExpr<'a> = Result<Expr, RloxError>;
-type ResStmt<'a> = Result<Stmt, RloxError>;
-type ResListStmt<'a> = Result<Vec<Stmt>, RloxError>;
+type ResExpr = Result<Expr, RloxError>;
+type ResStmt = Result<Stmt, RloxError>;
+type ResListStmt = Result<Vec<Stmt>, RloxError>;
 
 impl<'a> ParserState<'a> {
     fn new(tokens: &'a Vec<Token>) -> ParserState {
@@ -33,7 +33,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    fn parse(mut self) -> ResListStmt<'a> {
+    fn parse(mut self) -> ResListStmt {
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.is_at_end() {
             match self.declaration() {
@@ -45,7 +45,7 @@ impl<'a> ParserState<'a> {
         Ok(statements)
     }
 
-    fn declaration(&mut self) -> ResStmt<'a> {
+    fn declaration(&mut self) -> ResStmt {
         if self.match_next_one(TokenType::Var) {
             let decl_result = self.var_declaration();
             if let Err(_) = &decl_result {
@@ -61,7 +61,7 @@ impl<'a> ParserState<'a> {
         statement_result
     }
 
-    fn var_declaration(&mut self) -> ResStmt<'a> {
+    fn var_declaration(&mut self) -> ResStmt {
         let name = self.consume(TokenType::Identifier, "Expect variable name.")?;
 
         let initializer = if self.match_next_one(TokenType::Equal) {
@@ -75,7 +75,7 @@ impl<'a> ParserState<'a> {
         Ok(Stmt::Var { name, initializer })
     }
 
-    fn statement(&mut self) -> ResStmt<'a> {
+    fn statement(&mut self) -> ResStmt {
         if self.match_next_one(TokenType::Print) {
             return self.print_statement();
         } else if self.match_next_one(TokenType::LeftBrace) {
@@ -88,7 +88,7 @@ impl<'a> ParserState<'a> {
         self.expression_statement()
     }
 
-    fn block(&mut self) -> ResListStmt<'a> {
+    fn block(&mut self) -> ResListStmt {
         let mut statements = Vec::new();
 
         while !self.check(TokenType::RightBrace) && !self.is_at_end() {
@@ -99,19 +99,19 @@ impl<'a> ParserState<'a> {
         Ok(statements)
     }
 
-    fn print_statement(&mut self) -> ResStmt<'a> {
+    fn print_statement(&mut self) -> ResStmt {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after print statement.")?;
         Ok(Stmt::Print { expr })
     }
 
-    fn expression_statement(&mut self) -> ResStmt<'a> {
+    fn expression_statement(&mut self) -> ResStmt {
         let expr = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
         Ok(Stmt::Expression { expr })
     }
 
-    fn if_statement(&mut self) -> ResStmt<'a> {
+    fn if_statement(&mut self) -> ResStmt {
         self.consume(TokenType::LeftParen, "Expect '(' after if.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after if condition")?;
@@ -126,15 +126,15 @@ impl<'a> ParserState<'a> {
         Ok(Stmt::If {condition, then_branch: Box::new(then_branch), else_branch})
     }
 
-    fn parse_expression(mut self) -> ResExpr<'a> {
+    fn parse_expression(mut self) -> ResExpr {
         self.expression()
     }
 
-    fn expression(&mut self) -> ResExpr<'a> {
+    fn expression(&mut self) -> ResExpr {
         self.assignment()
     }
 
-    fn assignment(&mut self) -> ResExpr<'a> {
+    fn assignment(&mut self) -> ResExpr {
         let expr = self.equality()?;
 
         if self.match_next_one(TokenType::Equal) {
@@ -150,7 +150,7 @@ impl<'a> ParserState<'a> {
         return Ok(expr);
     }
 
-    fn equality(&mut self) -> ResExpr<'a> {
+    fn equality(&mut self) -> ResExpr {
         let mut expr = self.comparison()?;
 
         while self.match_next(&[TokenType::BangEqual, TokenType::EqualEqual]) {
@@ -166,7 +166,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> ResExpr<'a> {
+    fn comparison(&mut self) -> ResExpr {
         let mut expr = self.addition()?;
 
         while self.match_next(&[TokenType::Greater, TokenType::GreaterEqual, TokenType::Less, TokenType::LessEqual]) {
@@ -182,7 +182,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn addition(&mut self) -> ResExpr<'a> {
+    fn addition(&mut self) -> ResExpr {
         let mut expr = self.multiplication()?;
 
         while self.match_next(&[TokenType::Plus, TokenType::Minus]) {
@@ -198,7 +198,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn multiplication(&mut self) -> ResExpr<'a> {
+    fn multiplication(&mut self) -> ResExpr {
         let mut expr = self.unary()?;
 
         while self.match_next(&[TokenType::Star, TokenType::Slash]) {
@@ -214,7 +214,7 @@ impl<'a> ParserState<'a> {
         Ok(expr)
     }
 
-    fn unary(&mut self) -> ResExpr<'a> {
+    fn unary(&mut self) -> ResExpr {
         if self.match_next(&[TokenType::Bang, TokenType::Minus]) {
             let operator = self.previous();
             let right = self.unary()?;
@@ -227,7 +227,7 @@ impl<'a> ParserState<'a> {
         self.primary()
     }
 
-    fn primary(&mut self) -> ResExpr<'a> {
+    fn primary(&mut self) -> ResExpr {
         if self.match_next_one(TokenType::False) {
             return Ok(Expr::Literal { value: ExprVal::Boolean(false) });
         }
