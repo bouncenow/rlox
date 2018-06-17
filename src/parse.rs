@@ -85,6 +85,8 @@ impl<'a> ParserState<'a> {
             return self.if_statement();
         } else if self.match_next_one(TokenType::While) {
             return self.while_statement();
+        } else if self.match_next_one(TokenType::For) {
+            return self.for_statement();
         }
 
         self.expression_statement()
@@ -135,6 +137,51 @@ impl<'a> ParserState<'a> {
         let body = self.statement()?;
 
         Ok(Stmt::While { condition: Box::new(condition), body: Box::new(body) })
+    }
+
+    fn for_statement(&mut self) -> ResStmt {
+        self.consume(TokenType::LeftParen, "Expect '(' after for.")?;
+
+        let initializer = if self.match_next_one(TokenType::Semicolon) {
+            None
+        } else if self.match_next_one(TokenType::Var) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+
+        let for_condition = if !self.check(TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expect ';' after loop condition")?;
+
+        let increment = if !self.check(TokenType::RightParen) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::RightParen, "Expect ')' after for clauses.")?;
+
+        let for_body = self.statement()?;
+
+        let while_body = match increment {
+            Some(e) => Stmt::Block { statements: vec![for_body, Stmt::Expression { expr: e }] },
+            None => for_body
+        };
+
+        let while_condition = match for_condition {
+            Some(e) => e,
+            None => Expr::Literal { value: ExprVal::Boolean(true) }
+        };
+        let while_loop = Stmt::While { condition: Box::new(while_condition), body: Box::new(while_body) };
+
+        let whole_stmt = match initializer {
+            Some(s) => Stmt::Block { statements: vec![s, while_loop] },
+            None => while_loop
+        };
+        Ok(whole_stmt)
     }
 
     fn parse_expression(mut self) -> ResExpr {

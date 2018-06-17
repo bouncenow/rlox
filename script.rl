@@ -1,5 +1,5 @@
-var a = 1;
-
-while (a < 5) a = a + 1;
-
-print a;
+for (var a = 1; a < 10; a = a + 2) {
+    var b = 1;
+    print a + b;
+    b = b + 1;
+}
