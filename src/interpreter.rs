@@ -8,7 +8,7 @@ use scan::TokenType;
 use scan::Token;
 use stmt::*;
 use functions::*;
-use class::RloxClass;
+use class::*;
 
 pub struct Interpreter {
     globals: Rc<RefCell<Environment>>,
@@ -408,7 +408,7 @@ impl Interpreter {
             Expr::Get { object, name } => {
                 let object = self.evaluate(&object)?;
                 if let ExprVal::ClassInstance(c) = object {
-                    c.borrow().get(&name.lexeme)
+                    self.resolve_instance_property(Rc::clone(&c), &name)
                 } else {
                     Err(IError::Error("Only instances have properties.".to_string()))
                 }
@@ -422,6 +422,28 @@ impl Interpreter {
                     Ok(value)
                 } else {
                     Err(IError::Error("Only instances have fields.".to_string()))
+                }
+            }
+
+            Expr::This { keyword, resolve_at } => {
+                let val = self.look_up_variable(keyword, *resolve_at)?;
+                match val {
+                    Some(v) => Ok(v),
+                    None => Ok(ExprVal::Nil),
+                }
+            }
+        }
+    }
+
+    fn resolve_instance_property(&self, instance: Rc<RefCell<ClassInstance>>, name: &Token) -> IResult<ExprVal> {
+        let borrowed_instance = instance.borrow();
+        match borrowed_instance.get_instance_field(&name.lexeme) {
+            Some(e) => Ok(e),
+            None => {
+                let class = Rc::clone(&borrowed_instance.class);
+                match class.find_method(&name.lexeme, Rc::clone(&instance)) {
+                    Some(m) => Ok(ExprVal::Callable(m)),
+                    None => Err(IError::Error(format!("Unresolved method: {}", &name.lexeme)))
                 }
             }
         }

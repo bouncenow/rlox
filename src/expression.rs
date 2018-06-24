@@ -20,6 +20,7 @@ pub enum Expr {
     FunctionExpr { body: FunctionBody },
     Get { object: Box<Expr>, name: Token },
     Set { object: Box<Expr>, name: Token, value: Box<Expr> },
+    This { keyword: Token, resolve_at: Option<usize> },
 }
 
 

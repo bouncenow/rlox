@@ -19,9 +19,12 @@ impl RloxClass {
         RloxClass {name, methods: Rc::new(methods) }
     }
 
-    fn find_method(&self, name: &str) -> Option<Rc<RloxFunction>> {
+    pub fn find_method(&self, name: &str, instance: Rc<RefCell<ClassInstance>>) -> Option<Rc<RloxFunction>> {
         match self.methods.get(name) {
-            Some(f) => Some(Rc::clone(f)),
+            Some(f) => {
+                let bind_method = f.bind(instance);
+                Some(Rc::new(bind_method))
+            }
             None => None,
         }
     }
@@ -38,14 +41,11 @@ impl ClassInstance {
         ClassInstance { class, fields: HashMap::new() }
     }
 
-    pub fn get(&self, name: &str) -> IResult<ExprVal> {
+    pub fn get_instance_field(&self, name: &str) -> Option<ExprVal> {
         if let Some(e) = self.fields.get(name) {
-            Ok(e.clone())
+            Some(e.clone())
         } else {
-            match self.class.find_method(name) {
-                Some(f) => Ok(ExprVal::Callable(f)),
-                None => Err(IError::Error(format!("Undefined property: {}.", name)))
-            }
+            None
         }
     }
 

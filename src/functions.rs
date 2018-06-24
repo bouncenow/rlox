@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use interpreter::*;
 use expression::ExprVal;
 use stmt::FunctionBody;
+use class::ClassInstance;
 
 pub trait RloxCallable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<ExprVal>) -> IResult<ExprVal>;
@@ -19,6 +20,12 @@ pub struct RloxFunction {
 impl RloxFunction {
     pub fn new(declaration: FunctionBody, closure: Rc<RefCell<Environment>>) -> RloxFunction {
         RloxFunction { declaration, closure }
+    }
+
+    pub fn bind(&self, instance: Rc<RefCell<ClassInstance>>) -> RloxFunction {
+        let mut env_with_this = Environment::new_with_enclosing(Rc::clone(&self.closure));
+        env_with_this.define("this".to_string(), Some(ExprVal::ClassInstance(instance)));
+        RloxFunction::new(self.declaration.clone(), Rc::new(RefCell::new(env_with_this)))
     }
 }
 

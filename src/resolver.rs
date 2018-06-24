@@ -53,9 +53,17 @@ impl Resolver {
                 self.declare(name)?;
                 self.define(name);
 
+                self.begin_scope();
+                match self.scopes.last_mut() {
+                    Some(s) => s.insert("this".to_string(), true),
+                    None => panic!("Scope stack should not be empty!"),
+                };
+
                 for ref mut method in methods {
                     self.resolve_function(&mut method.body, FunctionType::Method)?;
                 }
+
+                self.end_scope();
 
                 Ok(())
             }
@@ -135,6 +143,13 @@ impl Resolver {
             Expr::Assign { name, ref mut value, ref mut resolve_at } => {
                 self.resolve_expr(value)?;
                 if let Some(d) = self.resolve_local_distance(&name) {
+                    *resolve_at = Some(d);
+                }
+                Ok(())
+            }
+
+            Expr::This { keyword, ref mut resolve_at } => {
+                if let Some(d) = self.resolve_local_distance(&keyword) {
                     *resolve_at = Some(d);
                 }
                 Ok(())

@@ -467,6 +467,10 @@ impl<'a> ParserState<'a> {
             return Ok(Expr::Grouping { expr: Box::new(expr) });
         }
 
+        if self.match_next_one(TokenType::This) {
+            return Ok(Expr::This { keyword: self.previous().clone(), resolve_at: None });
+        }
+
         if self.match_next_one(TokenType::Identifier) {
             return Ok(Expr::Variable { name: self.previous().clone(), resolve_at: None });
         }
