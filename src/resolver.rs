@@ -8,6 +8,7 @@ use expression::*;
 pub struct Resolver<> {
     scopes: Vec<HashMap<String, bool>>,
     current_function_type: Option<FunctionType>,
+    current_class_type: Option<ClassType>,
 }
 
 #[derive(Copy, Clone)]
@@ -16,11 +17,16 @@ enum FunctionType {
     Method,
 }
 
+#[derive(Copy, Clone)]
+enum ClassType {
+    Class,
+}
+
 type RResult<T> = Result<T, String>;
 
 impl Resolver {
     pub fn new() -> Resolver {
-        Resolver { scopes: Vec::new(), current_function_type: None }
+        Resolver { scopes: Vec::new(), current_function_type: None, current_class_type: None }
     }
 
     pub fn resolve_single_stmt(&mut self, stmt: &mut Stmt) -> RResult<()> {
@@ -50,6 +56,7 @@ impl Resolver {
             }
 
             Stmt::Class { ref name, ref mut methods } => {
+                let enclosing = mem::replace(&mut self.current_class_type, Some(ClassType::Class));
                 self.declare(name)?;
                 self.define(name);
 
@@ -65,6 +72,7 @@ impl Resolver {
 
                 self.end_scope();
 
+                self.current_class_type = enclosing;
                 Ok(())
             }
 
@@ -149,6 +157,9 @@ impl Resolver {
             }
 
             Expr::This { keyword, ref mut resolve_at } => {
+                if let None = self.current_class_type {
+                    return Err("Cannot use this outside of the class".to_string());
+                }
                 if let Some(d) = self.resolve_local_distance(&keyword) {
                     *resolve_at = Some(d);
                 }
