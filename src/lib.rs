@@ -6,3 +6,4 @@ pub mod expression;
 pub mod stmt;
 pub mod functions;
 pub mod resolver;
+pub mod class;

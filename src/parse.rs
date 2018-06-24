@@ -50,6 +50,8 @@ impl<'a> ParserState<'a> {
     fn declaration(&mut self) -> ResStmt {
         let result = if self.match_next_one(TokenType::Var) {
             self.var_declaration()
+        } else if self.match_next_one(TokenType::Class) {
+            self.class_declaration()
         } else if self.match_next_one(TokenType::Fun) {
             self.function_decl_or_expr()
         } else {
@@ -77,9 +79,24 @@ impl<'a> ParserState<'a> {
         Ok(Stmt::Var { name, initializer })
     }
 
+    fn class_declaration(&mut self) -> ResStmt {
+        let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+        self.consume(TokenType::LeftBrace, "Expect '{' after class name")?;
+
+        let mut methods = Vec::new();
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            methods.push(self.function("method")?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after class body")?;
+
+        Ok(Stmt::Class { name, methods })
+    }
+
     fn function_decl_or_expr(&mut self) -> ResStmt {
         if self.check(TokenType::Identifier) {
-            return self.function("function");
+            let decl = self.function("function")?;
+            return Ok(Stmt::Function { decl });
         }
 
         let func_expr = self.function_expr()?;
@@ -91,11 +108,11 @@ impl<'a> ParserState<'a> {
         Ok(Expr::FunctionExpr { body })
     }
 
-    fn function(&mut self, kind: &'static str) -> ResStmt {
+    fn function(&mut self, kind: &'static str) -> Result<FunctionDecl, RloxError> {
         let name = self.consume(TokenType::Identifier, &format!("Expect {} name", kind))?;
         let body = self.function_body(kind)?;
 
-        Ok(Stmt::Function { decl: FunctionDecl { name, body } })
+        Ok(FunctionDecl { name, body })
     }
 
     fn function_body(&mut self, kind: &'static str) -> Result<FunctionBody, RloxError> {

@@ -8,6 +8,7 @@ use scan::TokenType;
 use scan::Token;
 use stmt::*;
 use functions::*;
+use class::RloxClass;
 
 pub struct Interpreter {
     globals: Rc<RefCell<Environment>>,
@@ -209,6 +210,12 @@ impl Interpreter {
                 let function = RloxFunction::new(decl.body.clone(), Rc::clone(&self.current_env));
                 self.current_env.borrow_mut().define(decl.name.lexeme.clone(),
                                                                    Some(ExprVal::Callable(Rc::new(function))));
+                Ok(())
+            }
+
+            Stmt::Class { name, .. } => {
+                let class = ExprVal::Class(RloxClass { name: name.clone() });
+                self.current_env.borrow_mut().define(name.lexeme.clone(), Some(class));
                 Ok(())
             }
 

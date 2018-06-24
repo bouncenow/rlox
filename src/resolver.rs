@@ -48,6 +48,12 @@ impl Resolver {
                 self.resolve_function(&mut decl.body, FunctionType::Function)
             }
 
+            Stmt::Class { ref name, ..} => {
+                self.declare(name)?;
+                self.define(name);
+                Ok(())
+            }
+
             Stmt::Expression { ref mut expr } => {
                 self.resolve_expr(expr)
             }
