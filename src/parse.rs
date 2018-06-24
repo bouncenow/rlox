@@ -95,7 +95,7 @@ impl<'a> ParserState<'a> {
         let name = self.consume(TokenType::Identifier, &format!("Expect {} name", kind))?;
         let body = self.function_body(kind)?;
 
-        Ok(Stmt::Function { name, body })
+        Ok(Stmt::Function { decl: FunctionDecl { name, body } })
     }
 
     fn function_body(&mut self, kind: &'static str) -> Result<FunctionBody, RloxError> {

@@ -41,11 +41,11 @@ impl Resolver {
                 Ok(())
             }
 
-            Stmt::Function { ref mut body, name } => {
-                self.declare(&name)?;
-                self.define(&name);
+            Stmt::Function { ref mut decl } => {
+                self.declare(&decl.name)?;
+                self.define(&decl.name);
 
-                self.resolve_function(body, FunctionType::Function)
+                self.resolve_function(&mut decl.body, FunctionType::Function)
             }
 
             Stmt::Expression { ref mut expr } => {

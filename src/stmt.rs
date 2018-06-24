@@ -6,7 +6,7 @@ use scan::Token;
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Expression { expr: Expr },
-    Function { name: Token, body: FunctionBody },
+    Function { decl: FunctionDecl },
     Print { expr: Expr },
     Var { name: Token, initializer: Option<Expr> },
     Block { statements: Vec<Stmt> },
@@ -14,6 +14,12 @@ pub enum Stmt {
     While { condition: Box<Expr>, body: Box<Stmt> },
     Return { keyword: Token, value: Option<Box<Expr>> },
     Break,
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionDecl {
+    pub name: Token,
+    pub body: FunctionBody,
 }
 
 #[derive(Clone)]
