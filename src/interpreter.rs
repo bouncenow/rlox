@@ -397,6 +397,26 @@ impl Interpreter {
                     Err(IError::Error("Can only call functions and classes.".to_string()))
                 }
             }
+
+            Expr::Get { object, name } => {
+                let object = self.evaluate(&object)?;
+                if let ExprVal::ClassInstance(c) = object {
+                    c.borrow().get(&name.lexeme)
+                } else {
+                    Err(IError::Error("Only instances have properties.".to_string()))
+                }
+            }
+
+            Expr::Set { object, name, value } => {
+                let object = self.evaluate(&object)?;
+                if let ExprVal::ClassInstance(c) = object {
+                    let value = self.evaluate(&value)?;
+                    c.borrow_mut().set(&name.lexeme, value.clone());
+                    Ok(value)
+                } else {
+                    Err(IError::Error("Only instances have fields.".to_string()))
+                }
+            }
         }
     }
 

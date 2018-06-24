@@ -1,5 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 use scan::Token;
 use functions::RloxCallable;
@@ -17,6 +18,8 @@ pub enum Expr {
     Logical { left: Box<Expr>, operator: Token, right: Box<Expr> },
     Call { callee: Box<Expr>, paren: Token, arguments: Vec<Expr> },
     FunctionExpr { body: FunctionBody },
+    Get { object: Box<Expr>, name: Token },
+    Set { object: Box<Expr>, name: Token, value: Box<Expr> },
 }
 
 
@@ -26,7 +29,7 @@ pub enum ExprVal {
     Double(f64),
     Boolean(bool),
     Callable(Rc<RloxCallable>),
-    ClassInstance(ClassInstance),
+    ClassInstance(Rc<RefCell<ClassInstance>>),
     Nil,
 }
 
@@ -38,7 +41,7 @@ impl fmt::Display for ExprVal {
             ExprVal::Boolean(b) => write!(f, "{}", b),
             &ExprVal::Nil => write!(f, "nil"),
             ExprVal::Callable(_) => write!(f, "callable <>"),
-            ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.class.name.lexeme)
+            ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.borrow().class.name.lexeme)
         }
     }
 }
@@ -63,7 +66,7 @@ impl fmt::Debug for ExprVal {
             ExprVal::Boolean(b) => write!(f, "{}", b),
             &ExprVal::Nil => write!(f, "nil"),
             ExprVal::Callable(_) => write!(f, "callable <>"),
-            ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.class.name.lexeme)
+            ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.borrow().class.name.lexeme)
         }
     }
 }

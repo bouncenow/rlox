@@ -298,6 +298,8 @@ impl<'a> ParserState<'a> {
 
             return if let Expr::Variable { name, .. } = expr {
                 Ok(Expr::Assign { name, value: Box::new(value), resolve_at: None })
+            } else if let Expr::Get { object, name } = expr {
+                Ok(Expr::Set { object, name, value: Box::new(value) })
             } else {
                 Err(RloxError::new("Invalid assignment target".to_string()))
             };
@@ -413,7 +415,10 @@ impl<'a> ParserState<'a> {
         loop {
             if self.match_next_one(TokenType::LeftParen) {
                 expr = self.finish_call(expr)?;
-            } else {
+            } else if self.match_next_one(TokenType::Dot) {
+                let name = self.consume(TokenType::Identifier, "Expect property name after '.'.")?;
+                expr = Expr::Get { object: Box::new(expr), name };
+            } else{
                 break;
             }
         }

@@ -152,6 +152,15 @@ impl Resolver {
                 Ok(())
             }
 
+            Expr::Get { ref mut object, .. } => {
+                self.resolve_expr(object)
+            }
+
+            Expr::Set { ref mut object, ref mut value, ..} => {
+                self.resolve_expr(object)?;
+                self.resolve_expr(value)
+            }
+
             Expr::Grouping { ref mut expr } => {
                 self.resolve_expr(expr)
             }
