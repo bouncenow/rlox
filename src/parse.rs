@@ -8,7 +8,7 @@ struct ParserState<'a> {
     tokens: &'a Vec<Token>,
     errors: Vec<String>,
     current: usize,
-    inside_loop_count: usize,
+    loop_stack: Vec<usize>,
 }
 
 pub fn parse_for_expression(tokens: &Vec<Token>) -> Result<Expr, RloxError> {
@@ -31,7 +31,7 @@ impl<'a> ParserState<'a> {
             tokens,
             errors: Vec::new(),
             current: 0,
-            inside_loop_count: 0,
+            loop_stack: vec![0],
         }
     }
 
@@ -97,7 +97,9 @@ impl<'a> ParserState<'a> {
         self.consume(TokenType::RightParen, "Expect ')' after the arguments")?;
 
         self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body", kind))?;
+        self.increase_loop_stack();
         let body = self.block()?;
+        self.pop_loop_stack();
 
         Ok(Stmt::Function { decl: FunctionDecl { name, parameters, body } })
     }
@@ -426,16 +428,33 @@ impl<'a> ParserState<'a> {
         Err(RloxError::new("Expect expression".to_string()))
     }
 
+    fn increase_loop_stack(&mut self) {
+        self.loop_stack.push(0)
+    }
+
+    fn pop_loop_stack(&mut self) {
+        self.loop_stack.pop().unwrap();
+    }
+
     fn start_loop(&mut self) {
-        self.inside_loop_count += 1;
+        match self.loop_stack.last_mut() {
+            Some(d) => *d += 1,
+            None => panic!("Illegally constructed loop stack"),
+        }
     }
 
     fn end_loop(&mut self) {
-        self.inside_loop_count -= 1;
+        match self.loop_stack.last_mut() {
+            Some(d) => *d -= 1,
+            None => panic!("Illegally constructed loop stack"),
+        }
     }
 
     fn is_inside_loop(&self) -> bool {
-        self.inside_loop_count > 0
+        match self.loop_stack.last() {
+            Some(d) => *d > 0,
+            None => panic!("Illegally constructed loop stack"),
+        }
     }
 
     fn synchronize(&mut self) {

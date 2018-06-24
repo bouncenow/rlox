@@ -34,6 +34,9 @@ impl RloxCallable for RloxFunction {
             Err(IError::Return(value)) => {
                 Ok(value)
             },
+            Err(IError::Break) => {
+                panic!("Illegally placed break statement, should be a parse error")
+            }
             Err(e) => Err(e),
             _ => Ok(ExprVal::Nil)
         }

@@ -1,13 +1,15 @@
-for (var i = 0; i < 100; i = i + 1) {
-    for (var j = i; j > -4; j = j - 1) {
-        print "Inside loop";
-        print (j * j);
-        if (j == 0) {
-            break;
+for (var i = 0; i < 3; i = i + 1) {
+    fun inside() {
+        print i;
+        for (var j = -3; j < i; j = j + 1) {
+            print j;
+            if (j == -2) {
+                break;
+            }
         }
     }
-    if (i > 3) {
+    if (i == 1) {
         break;
     }
-    print i;
+    inside();
 }

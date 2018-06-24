@@ -142,6 +142,10 @@ impl Interpreter {
     pub fn execute(&mut self, statements: &[Stmt]) {
         for s in statements.iter() {
             match self.execute_single(s) {
+                Err(IError::Return(_)) => panic!("Illegally placed return statement, should be a \
+                    resolve error"),
+                Err(IError::Break) => panic!("Illegally placed break statement, should be a parse \
+                    error"),
                 Err(e) => println!("Runtime error: {}", e),
                 _ => {}
             }
