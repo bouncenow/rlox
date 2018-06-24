@@ -213,8 +213,15 @@ impl Interpreter {
                 Ok(())
             }
 
-            Stmt::Class { name, .. } => {
-                let class = ExprVal::Callable(Rc::new(RloxClass { name: name.clone() }));
+            Stmt::Class { name, methods } => {
+
+                let mut methods_with_names = HashMap::new();
+                for method_decl in methods.iter() {
+                    let method = Rc::new(RloxFunction::new(method_decl.body.clone(), Rc::clone(&self.current_env)));
+                    methods_with_names.insert(method_decl.name.lexeme.clone(), method);
+                }
+
+                let class = ExprVal::Callable(Rc::new(RloxClass::new(name.clone(), methods_with_names)));
                 self.current_env.borrow_mut().define(name.lexeme.clone(), Some(class));
                 Ok(())
             }

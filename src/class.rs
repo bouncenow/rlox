@@ -4,13 +4,27 @@ use std::collections::HashMap;
 use std::cell::RefCell;
 
 use scan::*;
-use functions::RloxCallable;
+use functions::*;
 use interpreter::*;
 use expression::*;
 
 #[derive(Clone)]
 pub struct RloxClass {
-    pub name: Token
+    pub name: Token,
+    pub methods: Rc<HashMap<String, Rc<RloxFunction>>>,
+}
+
+impl RloxClass {
+    pub fn new(name: Token, methods: HashMap<String, Rc<RloxFunction>>) -> RloxClass {
+        RloxClass {name, methods: Rc::new(methods) }
+    }
+
+    fn find_method(&self, name: &str) -> Option<Rc<RloxFunction>> {
+        match self.methods.get(name) {
+            Some(f) => Some(Rc::clone(f)),
+            None => None,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -28,7 +42,10 @@ impl ClassInstance {
         if let Some(e) = self.fields.get(name) {
             Ok(e.clone())
         } else {
-            Err(IError::Error(format!("Undefined property: {}.", name)))
+            match self.class.find_method(name) {
+                Some(f) => Ok(ExprVal::Callable(f)),
+                None => Err(IError::Error(format!("Undefined property: {}.", name)))
+            }
         }
     }
 

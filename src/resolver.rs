@@ -12,7 +12,8 @@ pub struct Resolver<> {
 
 #[derive(Copy, Clone)]
 enum FunctionType {
-    Function
+    Function,
+    Method,
 }
 
 type RResult<T> = Result<T, String>;
@@ -48,9 +49,14 @@ impl Resolver {
                 self.resolve_function(&mut decl.body, FunctionType::Function)
             }
 
-            Stmt::Class { ref name, ..} => {
+            Stmt::Class { ref name, ref mut methods } => {
                 self.declare(name)?;
                 self.define(name);
+
+                for ref mut method in methods {
+                    self.resolve_function(&mut method.body, FunctionType::Method)?;
+                }
+
                 Ok(())
             }
 
