@@ -1,5 +1,10 @@
-for (var a = 1; a < 10; a = a + 2) {
-    var b = 1;
-    print a + b;
-    b = b + 1;
+var a = "global";
+{
+  fun showA() {
+    print a;
+  }
+
+  showA();
+  var a = "block";
+  showA();
 }

@@ -1,7 +1,7 @@
 use scan::*;
 use expression::Expr;
 use expression::ExprVal;
-use stmt::Stmt;
+use stmt::*;
 use util::RloxError;
 
 struct ParserState<'a> {
@@ -46,19 +46,19 @@ impl<'a> ParserState<'a> {
     }
 
     fn declaration(&mut self) -> ResStmt {
-        if self.match_next_one(TokenType::Var) {
-            let decl_result = self.var_declaration();
-            if let Err(_) = &decl_result {
-                self.synchronize();
-            }
-            return decl_result;
-        }
+        let result = if self.match_next_one(TokenType::Var) {
+            self.var_declaration()
+        } else if self.match_next_one(TokenType::Fun) {
+            self.function("function")
+        } else {
+            self.statement()
+        };
 
-        let statement_result = self.statement();
-        if let Err(_) = &statement_result {
+        if let Err(_) = &result {
             self.synchronize();
         }
-        statement_result
+
+        result
     }
 
     fn var_declaration(&mut self) -> ResStmt {
@@ -75,6 +75,43 @@ impl<'a> ParserState<'a> {
         Ok(Stmt::Var { name, initializer })
     }
 
+    fn function(&mut self, kind: &'static str) -> ResStmt {
+        let name = self.consume(TokenType::Identifier, &format!("Expect {} name", kind))?;
+        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name", kind))?;
+
+        let mut parameters = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 8 {
+                    return Err(RloxError::new("Can't have more than 8 parameters".to_string()));
+                }
+
+                parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?);
+                if !self.match_next_one(TokenType::Comma) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after the arguments")?;
+
+        self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body", kind))?;
+        let body = self.block()?;
+
+        Ok(Stmt::Function { decl: FunctionDecl { name, parameters, body } })
+    }
+
+    fn return_statement(&mut self) -> ResStmt {
+        let keyword = self.previous();
+        let value = if !self.check(TokenType::Semicolon) {
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after return statement")?;
+        Ok(Stmt::Return { keyword, value })
+    }
+
     fn statement(&mut self) -> ResStmt {
         if self.match_next_one(TokenType::Print) {
             return self.print_statement();
@@ -87,6 +124,8 @@ impl<'a> ParserState<'a> {
             return self.while_statement();
         } else if self.match_next_one(TokenType::For) {
             return self.for_statement();
+        } else if self.match_next_one(TokenType::Return) {
+            return self.return_statement();
         }
 
         self.expression_statement()
@@ -198,8 +237,8 @@ impl<'a> ParserState<'a> {
         if self.match_next_one(TokenType::Equal) {
             let value = self.assignment()?;
 
-            return if let Expr::Variable { name } = expr {
-                Ok(Expr::Assign { name, value: Box::new(value) })
+            return if let Expr::Variable { name, .. } = expr {
+                Ok(Expr::Assign { name, value: Box::new(value), resolve_at: None })
             } else {
                 Err(RloxError::new("Invalid assignment target".to_string()))
             };
@@ -306,7 +345,36 @@ impl<'a> ParserState<'a> {
             });
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> ResExpr {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_next_one(TokenType::LeftParen) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> ResExpr {
+        let mut arguments = Vec::new();
+
+        if !self.check(TokenType::RightParen) {
+            arguments.push(self.expression()?);
+            while self.match_next_one(TokenType::Comma) {
+                arguments.push(self.expression()?);
+            }
+        }
+
+        let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments")?;
+
+        Ok(Expr::Call { callee: Box::new(callee), paren, arguments })
     }
 
     fn primary(&mut self) -> ResExpr {
@@ -336,7 +404,7 @@ impl<'a> ParserState<'a> {
         }
 
         if self.match_next_one(TokenType::Identifier) {
-            return Ok(Expr::Variable { name: self.previous().clone() });
+            return Ok(Expr::Variable { name: self.previous().clone(), resolve_at: None });
         }
 
         Err(RloxError::new("Expect expression".to_string()))

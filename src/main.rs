@@ -10,6 +10,7 @@ use std::io::Write;
 use rlox::scan;
 use rlox::parse;
 use rlox::interpreter::Interpreter;
+use rlox::resolver::Resolver;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -59,9 +60,16 @@ fn run_file(file_name: String) {
             println!("Scanning error: {}", e.error);
             process::exit(1)
         });
-    let program = parse::parse(&tokens)
+    let mut program = parse::parse(&tokens)
         .unwrap_or_else(|e| {
             println!("Parsing error: {}", e);
+            process::exit(1)
+        });
+
+    let mut resolver = Resolver::new();
+    resolver.resolve_stmts(&mut program)
+        .unwrap_or_else(|e| {
+            println!("Variable resolving error: {}", e);
             process::exit(1)
         });
 
@@ -88,9 +96,17 @@ fn run_line(interpreter: &mut Interpreter) {
     let scan_result = scan::scan_tokens(&line);
     match scan_result {
         Ok(tokens) => {
-            let parse_as_statements_res = parse::parse(&tokens);
+            let mut parse_as_statements_res = parse::parse(&tokens);
             match parse_as_statements_res {
-                Ok(ref statements) => interpreter.execute(statements),
+                Ok(mut statements) => {
+                    let mut resolver = Resolver::new();
+                    resolver.resolve_stmts(&mut statements)
+                        .unwrap_or_else(|e| {
+                            println!("Variable resolving error: {}", e);
+                            process::exit(1)
+                        });
+                    interpreter.execute(&statements)
+                },
                 Err(_) => {
                     let parse_result = parse::parse_for_expression(&tokens);
                     match parse_result {

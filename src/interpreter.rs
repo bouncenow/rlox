@@ -1,18 +1,22 @@
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
+use std::fmt;
 
 use expression::*;
 use scan::TokenType;
 use scan::Token;
 use stmt::*;
+use functions::*;
 
 pub struct Interpreter {
-    env: Rc<Environment>
+    globals: Rc<RefCell<Environment>>,
+    current_env: Rc<RefCell<Environment>>
 }
 
-struct Environment {
+pub struct Environment {
     values: HashMap<String, Option<ExprVal>>,
-    enclosing: Option<Rc<Environment>>,
+    enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -23,54 +27,114 @@ impl Environment {
         }
     }
 
-    fn new_with_enclosing(enclosing: Rc<Environment>) -> Environment {
+    pub fn new_with_enclosing(enclosing: Rc<RefCell<Environment>>) -> Environment {
         Environment {
             values: HashMap::new(),
             enclosing: Some(enclosing),
         }
     }
 
-    fn define(&mut self, name: String, value: Option<ExprVal>) {
+    pub fn define(&mut self, name: String, value: Option<ExprVal>) {
         self.values.insert(name, value);
     }
 
-    fn get(&self, name: String) -> Result<Option<ExprVal>, String> {
-        match self.values.get(&name) {
+    fn get(&self, name: &str) -> IResult<Option<ExprVal>> {
+        match self.values.get(&name as &str) {
             Some(v) => Ok(v.clone()),
             None => {
                 match self.enclosing {
-                    Some(ref e) => e.get(name),
-                    None => Err("Undeclared variable".to_string())
+                    Some(ref e) => e.borrow().get(name),
+                    None => Err(IError::Error(format!("Undeclared variable: {}", name)))
                 }
             }
         }
     }
 
-    fn assign(&mut self, name: Token, value: ExprVal) -> Result<(), String> {
+    fn assign(&mut self, name: Token, value: ExprVal) -> IResult<()> {
         if self.values.contains_key(&name.lexeme) {
             self.values.insert(name.lexeme, Some(value));
             Ok(())
         } else {
-            match self.enclosing {
-                Some(ref mut e) => Rc::get_mut(e).unwrap().assign(name, value),
-                None => Err(format!("Undefined variable: {}.", &name.lexeme))
+            match &self.enclosing {
+                Some(e) => {
+                    e.borrow_mut().assign(name, value)
+                }
+                None => Err(IError::Error(format!("Undefined variable: {}.", &name.lexeme)))
             }
         }
     }
 
-    fn get_enclosing(&self) -> Option<Rc<Environment>> {
-        match self.enclosing {
-            Some(ref e) => Some(Rc::clone(e)),
-            None => None
+    fn get_at(&self, distance: usize, name: Token) -> IResult<Option<ExprVal>> {
+        if distance > 0 {
+            let ancestor_env = self.ancestor(distance);
+            let ancestor_env_borrowed = ancestor_env.borrow();
+            Ok(ancestor_env_borrowed.get(&name.lexeme)?.clone())
+        } else {
+            Ok(self.get(&name.lexeme as &str)?.clone())
+        }
+    }
+
+    fn assign_at(&mut self, distance: usize, name: Token, value: ExprVal) -> IResult<()> {
+        if distance > 0 {
+            let ancestor_env = self.ancestor(distance);
+            let mut ancestor_env_borrowed = ancestor_env.borrow_mut();
+            ancestor_env_borrowed.assign(name, value)
+        } else {
+            self.assign(name, value)
+        }
+    }
+
+    fn ancestor(&self, distance: usize) -> Rc<RefCell<Environment>> {
+        if distance < 1 {
+            panic!("Can't get ancestor for 0 level (use self)")
+        }
+        let mut current = match &self.enclosing {
+            Some(e) => Rc::clone(e),
+            _ => panic!("Wrongly resolved variable")
+        };
+        for _ in 0..(distance - 1) {
+            let enclosing = match &current.borrow().enclosing {
+                Some(e) => Rc::clone(e),
+                None => panic!("Wrongly resolved variable")
+            };
+            current = enclosing;
+        }
+
+        current
+    }
+}
+
+pub type IResult<T> = Result<T, IError>;
+
+#[derive(Debug)]
+pub enum IError {
+    Error(String),
+    Return(ExprVal),
+}
+
+impl fmt::Display for IError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            IError::Error(s) => write!(f, "Runtime error: {}", s),
+            IError::Return(e) => write!(f, "Return statement: {}", e)
         }
     }
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
+        let mut global = Environment::new_global();
+        global.define("clock".to_string(), Some(ExprVal::Callable(Rc::new(Clock {}))));
+        let globals = Rc::new(RefCell::new(global));
+        let current_env = Rc::clone(&globals);
         Interpreter {
-            env: Rc::new(Environment::new_global())
+            globals,
+            current_env
         }
+    }
+
+    pub fn get_global_env(&self) -> Rc<RefCell<Environment>> {
+        Rc::clone(&self.globals)
     }
 
     pub fn execute(&mut self, statements: &[Stmt]) {
@@ -82,7 +146,7 @@ impl Interpreter {
         }
     }
 
-    fn execute_single(&mut self, statement: &Stmt) -> Result<(), String> {
+    fn execute_single(&mut self, statement: &Stmt) -> IResult<()> {
         match statement {
             Stmt::Print { expr } => {
                 let value = self.evaluate(&expr)?;
@@ -100,16 +164,16 @@ impl Interpreter {
                     Some(ref e) => Some(self.evaluate(e)?),
                     None => None
                 };
-                Rc::get_mut(&mut self.env).unwrap().define(name.lexeme.clone(), val);
+                self.current_env.borrow_mut().define(name.lexeme.clone(), val);
                 Ok(())
             }
 
             Stmt::Block { statements } => {
-                let current_env = Rc::clone(&self.env);
-                self.execute_block(&statements, Rc::new(Environment::new_with_enclosing(current_env)))
+                let current_env = Rc::clone(&self.current_env);
+                self.execute_block(&statements, Rc::new(RefCell::new(Environment::new_with_enclosing(current_env))))
             }
 
-            Stmt::If { condition, then_branch, else_branch} => {
+            Stmt::If { condition, then_branch, else_branch } => {
                 if is_truthy(&self.evaluate(&condition)?) {
                     self.execute_single(&then_branch)?;
                 } else {
@@ -126,24 +190,45 @@ impl Interpreter {
                 }
                 Ok(())
             }
+
+            Stmt::Function { decl } => {
+                let function = RloxFunction::new(decl.clone(), Rc::clone(&self.current_env));
+                self.current_env.borrow_mut().define(decl.name.lexeme.clone(),
+                                                                   Some(ExprVal::Callable(Rc::new(function))));
+                Ok(())
+            }
+
+            Stmt::Return { keyword: _, value } => {
+                let value = match value {
+                    Some(e) => self.evaluate(&e)?,
+                    None => ExprVal::Nil
+                };
+
+                Err(IError::Return(value))
+            }
         }
     }
 
-    fn execute_block(&mut self, statements: &Vec<Stmt>, env: Rc<Environment>) -> Result<(), String> {
-        self.env = env;
+    pub fn execute_block(
+        &mut self,
+        statements: &Vec<Stmt>,
+        block_env: Rc<RefCell<Environment>>
+    ) -> IResult<()> {
+        let previous_env = Rc::clone(&self.current_env);
+        self.current_env = block_env;
 
         for stmt in statements {
             let exec_res = self.execute_single(stmt);
             if let Err(_) = &exec_res {
-                self.env = self.env.get_enclosing().unwrap();
+                self.current_env = previous_env;
                 return exec_res;
             }
         }
-        self.env = self.env.get_enclosing().unwrap();
+        self.current_env = previous_env;
         Ok(())
     }
 
-    pub fn evaluate(&mut self, expr: &Expr) -> Result<ExprVal, String> {
+    pub fn evaluate(&mut self, expr: &Expr) -> IResult<ExprVal> {
         match expr {
             Expr::Literal { value } => Ok(value.clone()),
 
@@ -156,7 +241,7 @@ impl Interpreter {
                         if let ExprVal::Double(d) = operand {
                             Ok(ExprVal::Double(-d))
                         } else {
-                            Err("Expected operand to be double".to_string())
+                            Err(IError::Error("Expected operand to be double".to_string()))
                         }
                     }
                     TokenType::Bang => {
@@ -173,19 +258,19 @@ impl Interpreter {
                     TokenType::Minus => {
                         match (left_val, right_val) {
                             (ExprVal::Double(l), ExprVal::Double(r)) => Ok(ExprVal::Double(l - r)),
-                            _ => Err("Expected operands to be double".to_string())
+                            _ => Err(IError::Error("Expected operands to be double".to_string()))
                         }
                     }
                     TokenType::Slash => {
                         match (left_val, right_val) {
                             (ExprVal::Double(l), ExprVal::Double(r)) => Ok(ExprVal::Double(l / r)),
-                            _ => Err("Expected operands to be double".to_string())
+                            _ => Err(IError::Error("Expected operands to be double".to_string()))
                         }
                     }
                     TokenType::Star => {
                         match (left_val, right_val) {
                             (ExprVal::Double(l), ExprVal::Double(r)) => Ok(ExprVal::Double(l * r)),
-                            _ => Err("Expected operands to be double".to_string())
+                            _ => Err(IError::Error("Expected operands to be double".to_string()))
                         }
                     }
                     TokenType::Plus => {
@@ -195,31 +280,31 @@ impl Interpreter {
                                 let concat = format!("{}{}", l, r);
                                 Ok(ExprVal::String(concat))
                             }
-                            _ => Err("Expected operands to be strings or doubles".to_string())
+                            _ => Err(IError::Error("Expected operands to be strings or doubles".to_string()))
                         }
                     }
                     TokenType::GreaterEqual => {
                         match (left_val, right_val) {
                             (ExprVal::Double(l), ExprVal::Double(r)) => Ok(ExprVal::Boolean(l >= r)),
-                            _ => Err("Expected operands to be double".to_string())
+                            _ => Err(IError::Error("Expected operands to be double".to_string()))
                         }
                     }
                     TokenType::Greater => {
                         match (left_val, right_val) {
                             (ExprVal::Double(l), ExprVal::Double(r)) => Ok(ExprVal::Boolean(l > r)),
-                            _ => Err("Expected operands to be double".to_string())
+                            _ => Err(IError::Error("Expected operands to be double".to_string()))
                         }
                     }
                     TokenType::LessEqual => {
                         match (left_val, right_val) {
                             (ExprVal::Double(l), ExprVal::Double(r)) => Ok(ExprVal::Boolean(l <= r)),
-                            _ => Err("Expected operands to be double".to_string())
+                            _ => Err(IError::Error("Expected operands to be double".to_string()))
                         }
                     }
                     TokenType::Less => {
                         match (left_val, right_val) {
                             (ExprVal::Double(l), ExprVal::Double(r)) => Ok(ExprVal::Boolean(l < r)),
-                            _ => Err("Expected operands to be double".to_string())
+                            _ => Err(IError::Error("Expected operands to be double".to_string()))
                         }
                     }
                     TokenType::BangEqual => {
@@ -232,35 +317,67 @@ impl Interpreter {
                 }
             }
 
-            Expr::Variable { name } => {
-                let val = self.env.get(name.lexeme.clone())?;
+            Expr::Variable { name, resolve_at } => {
+                let val = self.look_up_variable(name, *resolve_at)?;
                 match val {
                     Some(v) => Ok(v),
                     None => Ok(ExprVal::Nil),
                 }
             }
 
-            Expr::Assign { name, value } => {
+            Expr::Assign { name, value, resolve_at } => {
                 let value = self.evaluate(&value)?;
-                Rc::get_mut(&mut self.env).unwrap().assign(name.clone(), value.clone())?;
+
+                match resolve_at {
+                    Some(d) => self.current_env.borrow_mut().assign_at(*d, name.clone(), value.clone())?,
+                    None => self.globals.borrow_mut().assign(name.clone(), value.clone())?
+                };
+
                 Ok(value.clone())
             }
 
-            Expr::Logical {left, operator, right} => {
+            Expr::Logical { left, operator, right } => {
                 let left = self.evaluate(&left)?;
 
                 if operator.token_type == TokenType::Or {
                     if is_truthy(&left) {
-                        return Ok(left)
+                        return Ok(left);
                     }
                 } else {
                     if !is_truthy(&left) {
-                        return Ok(left)
+                        return Ok(left);
                     }
                 }
 
                 self.evaluate(&right)
             }
+
+            Expr::Call { callee, paren: _, arguments } => {
+                let callee = self.evaluate(&callee)?;
+
+                let mut args_evaluated = Vec::new();
+                for a in arguments.iter() {
+                    let a_e = self.evaluate(a)?;
+                    args_evaluated.push(a_e);
+                }
+
+                if let ExprVal::Callable(c) = callee {
+                    if args_evaluated.len() == c.arity() {
+                        c.call(self, args_evaluated)
+                    } else {
+                        Err(IError::Error(format!("Expected {} arguments but got {}", c.arity(), args_evaluated.len())))
+                    }
+                } else {
+                    Err(IError::Error("Can only call functions and classes.".to_string()))
+                }
+            }
+        }
+    }
+
+    fn look_up_variable(&mut self, name: &Token, resolve_at: Option<usize>) -> IResult<Option<ExprVal>> {
+        match resolve_at {
+            Some(d) => Ok(self.current_env.borrow().get_at(d, name.clone())?),
+            None => Ok(self.globals.borrow().get(&name.lexeme)?)
         }
     }
 }

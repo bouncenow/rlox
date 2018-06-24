@@ -4,3 +4,5 @@ pub mod parse;
 pub mod interpreter;
 pub mod expression;
 pub mod stmt;
+pub mod functions;
+pub mod resolver;
