@@ -110,13 +110,15 @@ pub type IResult<T> = Result<T, IError>;
 pub enum IError {
     Error(String),
     Return(ExprVal),
+    Break,
 }
 
 impl fmt::Display for IError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             IError::Error(s) => write!(f, "Runtime error: {}", s),
-            IError::Return(e) => write!(f, "Return statement: {}", e)
+            IError::Return(e) => write!(f, "Return statement: {}", e),
+            &IError::Break => write!(f, "Break statement"),
         }
     }
 }
@@ -173,6 +175,10 @@ impl Interpreter {
                 self.execute_block(&statements, Rc::new(RefCell::new(Environment::new_with_enclosing(current_env))))
             }
 
+            &Stmt::Break => {
+                Err(IError::Break)
+            }
+
             Stmt::If { condition, then_branch, else_branch } => {
                 if is_truthy(&self.evaluate(&condition)?) {
                     self.execute_single(&then_branch)?;
@@ -186,7 +192,11 @@ impl Interpreter {
 
             Stmt::While { condition, body } => {
                 while is_truthy(&self.evaluate(&condition)?) {
-                    self.execute_single(&body)?;
+                    match self.execute_single(&body){
+                        Err(IError::Break) => break,
+                        Err(e) => return Err(e),
+                        _ => {}
+                    };
                 }
                 Ok(())
             }

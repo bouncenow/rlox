@@ -69,6 +69,8 @@ impl Resolver {
                 self.resolve_expr(condition)?;
                 self.resolve_single_stmt(body)
             }
+
+            &mut Stmt::Break => Ok(())
         }
     }
 

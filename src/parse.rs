@@ -8,6 +8,7 @@ struct ParserState<'a> {
     tokens: &'a Vec<Token>,
     errors: Vec<String>,
     current: usize,
+    inside_loop_count: usize,
 }
 
 pub fn parse_for_expression(tokens: &Vec<Token>) -> Result<Expr, RloxError> {
@@ -30,6 +31,7 @@ impl<'a> ParserState<'a> {
             tokens,
             errors: Vec::new(),
             current: 0,
+            inside_loop_count: 0,
         }
     }
 
@@ -126,6 +128,8 @@ impl<'a> ParserState<'a> {
             return self.for_statement();
         } else if self.match_next_one(TokenType::Return) {
             return self.return_statement();
+        } else if self.match_next_one(TokenType::Break) {
+            return self.break_statement();
         }
 
         self.expression_statement()
@@ -173,7 +177,9 @@ impl<'a> ParserState<'a> {
         self.consume(TokenType::LeftParen, "Expect '(' after while.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after while condition.")?;
+        self.start_loop();
         let body = self.statement()?;
+        self.end_loop();
 
         Ok(Stmt::While { condition: Box::new(condition), body: Box::new(body) })
     }
@@ -203,7 +209,9 @@ impl<'a> ParserState<'a> {
         };
         self.consume(TokenType::RightParen, "Expect ')' after for clauses.")?;
 
+        self.start_loop();
         let for_body = self.statement()?;
+        self.end_loop();
 
         let while_body = match increment {
             Some(e) => Stmt::Block { statements: vec![for_body, Stmt::Expression { expr: e }] },
@@ -221,6 +229,14 @@ impl<'a> ParserState<'a> {
             None => while_loop
         };
         Ok(whole_stmt)
+    }
+
+    fn break_statement(&mut self) -> ResStmt {
+        if !self.is_inside_loop() {
+            return Err(RloxError::new("Break statement can appear only inside the loop!".to_string()));
+        }
+        self.consume(TokenType::Semicolon, "Expect ';' after break.")?;
+        Ok(Stmt::Break)
     }
 
     fn parse_expression(mut self) -> ResExpr {
@@ -408,6 +424,18 @@ impl<'a> ParserState<'a> {
         }
 
         Err(RloxError::new("Expect expression".to_string()))
+    }
+
+    fn start_loop(&mut self) {
+        self.inside_loop_count += 1;
+    }
+
+    fn end_loop(&mut self) {
+        self.inside_loop_count -= 1;
+    }
+
+    fn is_inside_loop(&self) -> bool {
+        self.inside_loop_count > 0
     }
 
     fn synchronize(&mut self) {

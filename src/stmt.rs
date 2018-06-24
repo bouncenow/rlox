@@ -13,6 +13,7 @@ pub enum Stmt {
     If { condition: Expr, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>> },
     While { condition: Box<Expr>, body: Box<Stmt> },
     Return { keyword: Token, value: Option<Box<Expr>> },
+    Break,
 }
 
 #[derive(Clone)]
