@@ -214,7 +214,7 @@ impl Interpreter {
             }
 
             Stmt::Class { name, .. } => {
-                let class = ExprVal::Class(RloxClass { name: name.clone() });
+                let class = ExprVal::Callable(Rc::new(RloxClass { name: name.clone() }));
                 self.current_env.borrow_mut().define(name.lexeme.clone(), Some(class));
                 Ok(())
             }

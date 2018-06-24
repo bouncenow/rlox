@@ -4,7 +4,7 @@ use std::rc::Rc;
 use scan::Token;
 use functions::RloxCallable;
 use stmt::FunctionBody;
-use class::RloxClass;
+use class::ClassInstance;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -26,7 +26,7 @@ pub enum ExprVal {
     Double(f64),
     Boolean(bool),
     Callable(Rc<RloxCallable>),
-    Class(RloxClass),
+    ClassInstance(ClassInstance),
     Nil,
 }
 
@@ -37,8 +37,8 @@ impl fmt::Display for ExprVal {
             ExprVal::Double(d) => write!(f, "{}", d),
             ExprVal::Boolean(b) => write!(f, "{}", b),
             &ExprVal::Nil => write!(f, "nil"),
-            ExprVal::Callable(_) => write!(f, "fn<>"),
-            ExprVal::Class(c) => write!(f, "{}", c)
+            ExprVal::Callable(_) => write!(f, "callable <>"),
+            ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.class.name.lexeme)
         }
     }
 }
@@ -62,8 +62,8 @@ impl fmt::Debug for ExprVal {
             ExprVal::Double(d) => write!(f, "{}", d),
             ExprVal::Boolean(b) => write!(f, "{}", b),
             &ExprVal::Nil => write!(f, "nil"),
-            ExprVal::Callable(_) => write!(f, "fn<>"),
-            ExprVal::Class(c) => write!(f, "{}", c)
+            ExprVal::Callable(_) => write!(f, "callable <>"),
+            ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.class.name.lexeme)
         }
     }
 }
