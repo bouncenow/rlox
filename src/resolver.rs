@@ -34,11 +34,11 @@ impl Resolver {
                 Ok(())
             }
 
-            Stmt::Function { ref mut decl } => {
-                self.declare(&decl.name);
-                self.define(&decl.name);
+            Stmt::Function { ref mut body, name } => {
+                self.declare(&name);
+                self.define(&name);
 
-                self.resolve_function(decl)
+                self.resolve_function(body)
             }
 
             Stmt::Expression { ref mut expr } => {
@@ -81,7 +81,7 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_function(&mut self, func_decl: &mut FunctionDecl) -> RResult<()> {
+    fn resolve_function(&mut self, func_decl: &mut FunctionBody) -> RResult<()> {
         self.begin_scope();
         for p in func_decl.parameters.iter() {
             self.declare(p);
@@ -119,6 +119,10 @@ impl Resolver {
             Expr::Binary { ref mut left, ref mut right, .. } => {
                 self.resolve_expr(left)?;
                 self.resolve_expr(right)
+            }
+
+            Expr::FunctionExpr { ref mut body } => {
+                self.resolve_function(body)
             }
 
             Expr::Call { ref mut callee, ref mut arguments, .. } => {

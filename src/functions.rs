@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 use interpreter::*;
 use expression::ExprVal;
-use stmt::FunctionDecl;
+use stmt::FunctionBody;
 
 pub trait RloxCallable {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<ExprVal>) -> IResult<ExprVal>;
@@ -12,12 +12,12 @@ pub trait RloxCallable {
 }
 
 pub struct RloxFunction {
-    declaration: FunctionDecl,
+    declaration: FunctionBody,
     closure: Rc<RefCell<Environment>>
 }
 
 impl RloxFunction {
-    pub fn new(declaration: FunctionDecl, closure: Rc<RefCell<Environment>>) -> RloxFunction {
+    pub fn new(declaration: FunctionBody, closure: Rc<RefCell<Environment>>) -> RloxFunction {
         RloxFunction { declaration, closure }
     }
 }

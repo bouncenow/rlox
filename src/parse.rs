@@ -51,7 +51,7 @@ impl<'a> ParserState<'a> {
         let result = if self.match_next_one(TokenType::Var) {
             self.var_declaration()
         } else if self.match_next_one(TokenType::Fun) {
-            self.function("function")
+            self.function_decl_or_expr()
         } else {
             self.statement()
         };
@@ -77,8 +77,28 @@ impl<'a> ParserState<'a> {
         Ok(Stmt::Var { name, initializer })
     }
 
+    fn function_decl_or_expr(&mut self) -> ResStmt {
+        if self.check(TokenType::Identifier) {
+            return self.function("function");
+        }
+
+        let func_expr = self.function_expr()?;
+        Ok(Stmt::Expression { expr: func_expr })
+    }
+
+    fn function_expr(&mut self) -> ResExpr {
+        let body = self.function_body("function")?;
+        Ok(Expr::FunctionExpr { body })
+    }
+
     fn function(&mut self, kind: &'static str) -> ResStmt {
         let name = self.consume(TokenType::Identifier, &format!("Expect {} name", kind))?;
+        let body = self.function_body(kind)?;
+
+        Ok(Stmt::Function { name, body })
+    }
+
+    fn function_body(&mut self, kind: &'static str) -> Result<FunctionBody, RloxError> {
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name", kind))?;
 
         let mut parameters = Vec::new();
@@ -95,13 +115,12 @@ impl<'a> ParserState<'a> {
             }
         }
         self.consume(TokenType::RightParen, "Expect ')' after the arguments")?;
-
         self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body", kind))?;
         self.increase_loop_stack();
         let body = self.block()?;
         self.pop_loop_stack();
 
-        Ok(Stmt::Function { decl: FunctionDecl { name, parameters, body } })
+        Ok(FunctionBody {parameters, body})
     }
 
     fn return_statement(&mut self) -> ResStmt {
@@ -250,7 +269,12 @@ impl<'a> ParserState<'a> {
     }
 
     fn assignment(&mut self) -> ResExpr {
-        let expr = self.or()?;
+        let expr = if self.match_next_one(TokenType::Fun) {
+            let body = self.function_body("function")?;
+            Expr::FunctionExpr { body }
+        } else {
+            self.or()?
+        };
 
         if self.match_next_one(TokenType::Equal) {
             let value = self.assignment()?;

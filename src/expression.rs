@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use scan::Token;
 use functions::RloxCallable;
+use stmt::FunctionBody;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -14,6 +15,7 @@ pub enum Expr {
     Variable { name: Token, resolve_at: Option<usize> },
     Logical { left: Box<Expr>, operator: Token, right: Box<Expr> },
     Call { callee: Box<Expr>, paren: Token, arguments: Vec<Expr> },
+    FunctionExpr { body: FunctionBody },
 }
 
 

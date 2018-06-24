@@ -1,15 +1,15 @@
-for (var i = 0; i < 3; i = i + 1) {
-    fun inside() {
-        print i;
-        for (var j = -3; j < i; j = j + 1) {
-            print j;
-            if (j == -2) {
-                break;
-            }
-        }
-    }
-    if (i == 1) {
-        break;
-    }
-    inside();
+fun compose(f, g) {
+    return fun (e) {
+        return f(g(e));
+    };
 }
+
+var result = compose(fun (a) {
+    return a + 1;
+}, fun (b) {
+    return b * 2;
+});
+
+print result(3);
+
+(fun (b) { var c = b * 2; print c; })(10);

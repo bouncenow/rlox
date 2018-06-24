@@ -205,9 +205,9 @@ impl Interpreter {
                 Ok(())
             }
 
-            Stmt::Function { decl } => {
-                let function = RloxFunction::new(decl.clone(), Rc::clone(&self.current_env));
-                self.current_env.borrow_mut().define(decl.name.lexeme.clone(),
+            Stmt::Function { name, body } => {
+                let function = RloxFunction::new(body.clone(), Rc::clone(&self.current_env));
+                self.current_env.borrow_mut().define(name.lexeme.clone(),
                                                                    Some(ExprVal::Callable(Rc::new(function))));
                 Ok(())
             }
@@ -364,6 +364,11 @@ impl Interpreter {
                 }
 
                 self.evaluate(&right)
+            }
+
+            Expr::FunctionExpr { body } => {
+                let function = RloxFunction::new(body.clone(), Rc::clone(&self.current_env));
+                Ok(ExprVal::Callable(Rc::new(function)))
             }
 
             Expr::Call { callee, paren: _, arguments } => {
