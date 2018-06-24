@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::mem;
 
 use stmt::*;
 use scan::*;
@@ -6,13 +7,19 @@ use expression::*;
 
 pub struct Resolver<> {
     scopes: Vec<HashMap<String, bool>>,
+    current_function_type: Option<FunctionType>,
+}
+
+#[derive(Copy, Clone)]
+enum FunctionType {
+    Function
 }
 
 type RResult<T> = Result<T, String>;
 
 impl Resolver {
     pub fn new() -> Resolver {
-        Resolver { scopes: Vec::new() }
+        Resolver { scopes: Vec::new(), current_function_type: None }
     }
 
     pub fn resolve_single_stmt(&mut self, stmt: &mut Stmt) -> RResult<()> {
@@ -25,7 +32,7 @@ impl Resolver {
             }
 
             Stmt::Var { name, initializer } => {
-                self.declare(&name);
+                self.declare(&name)?;
                 match initializer {
                     Some(ref mut e) => self.resolve_expr(e)?,
                     None => {}
@@ -35,10 +42,10 @@ impl Resolver {
             }
 
             Stmt::Function { ref mut body, name } => {
-                self.declare(&name);
+                self.declare(&name)?;
                 self.define(&name);
 
-                self.resolve_function(body)
+                self.resolve_function(body, FunctionType::Function)
             }
 
             Stmt::Expression { ref mut expr } => {
@@ -59,6 +66,9 @@ impl Resolver {
             }
 
             Stmt::Return { value, .. } => {
+                if let None = self.current_function_type {
+                    return Err("Cannot return from top-level code".to_string());
+                }
                 match value {
                     Some(ref mut e) => self.resolve_expr(e),
                     None => Ok(())
@@ -81,15 +91,17 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_function(&mut self, func_decl: &mut FunctionBody) -> RResult<()> {
+    fn resolve_function(&mut self, func_decl: &mut FunctionBody, function_type: FunctionType) -> RResult<()> {
+        let enclosing = mem::replace(&mut self.current_function_type, Some(function_type));
         self.begin_scope();
         for p in func_decl.parameters.iter() {
-            self.declare(p);
+            self.declare(p)?;
             self.define(p);
         }
 
         self.resolve_stmts(&mut func_decl.body)?;
         self.end_scope();
+        self.current_function_type = enclosing;
         Ok(())
     }
 
@@ -122,7 +134,7 @@ impl Resolver {
             }
 
             Expr::FunctionExpr { ref mut body } => {
-                self.resolve_function(body)
+                self.resolve_function(body, FunctionType::Function)
             }
 
             Expr::Call { ref mut callee, ref mut arguments, .. } => {
@@ -156,7 +168,6 @@ impl Resolver {
     fn resolve_local_distance(&mut self, name: &Token) -> Option<usize> {
         for (i, s) in self.scopes.iter().rev().enumerate() {
             if s.contains_key(&name.lexeme) {
-                /*self.interpreter.resolve(expr, i);*/
                 return Some(i)
             }
         }
@@ -164,13 +175,18 @@ impl Resolver {
         None
     }
 
-    fn declare(&mut self, name: &Token) {
+    fn declare(&mut self, name: &Token) -> RResult<()> {
         match self.scopes.last_mut() {
             Some(scope) => {
-                scope.insert(name.lexeme.clone(), false);
+                if scope.contains_key(&name.lexeme) {
+                    Err("Variable with this name already declared in this scope".to_string())
+                } else {
+                    scope.insert(name.lexeme.clone(), false);
+                    Ok(())
+                }
             },
-            None => {}
-        };
+            None => Ok(())
+        }
     }
 
     fn define(&mut self, name: &Token) {
