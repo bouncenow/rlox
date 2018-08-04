@@ -14,7 +14,7 @@ pub enum Expr {
     Unary { operator: Token, right: Box<Expr> },
     Literal { value: ExprVal },
     Grouping { expr: Box<Expr> },
-    Variable { name: Token, resolve_at: Option<usize> },
+    Variable { v: Variable },
     Logical { left: Box<Expr>, operator: Token, right: Box<Expr> },
     Call { callee: Box<Expr>, paren: Token, arguments: Vec<Expr> },
     FunctionExpr { body: FunctionBody },
@@ -23,6 +23,11 @@ pub enum Expr {
     This { keyword: Token, resolve_at: Option<usize> },
 }
 
+#[derive(Debug, Clone)]
+pub struct Variable {
+    pub name: Token,
+    pub resolve_at: Option<usize>,
+}
 
 #[derive(Clone)]
 pub enum ExprVal {

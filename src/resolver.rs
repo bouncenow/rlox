@@ -146,15 +146,15 @@ impl Resolver {
 
     fn resolve_expr(&mut self, expr: &mut Expr) -> RResult<()> {
         match expr {
-            Expr::Variable { ref mut name, ref mut resolve_at } => {
+            Expr::Variable { ref mut v } => {
                 if let Some(s) = self.scopes.last() {
-                    if let Some(&false) = s.get(&name.lexeme) {
+                    if let Some(&false) = s.get(&v.name.lexeme) {
                         return Err("Cannot read local variable in its own initializer.".to_string());
                     }
                 }
 
-                if let Some(d) = self.resolve_local_distance(&name) {
-                    *resolve_at = Some(d);
+                if let Some(d) = self.resolve_local_distance(&v.name) {
+                    v.resolve_at = Some(d);
                 }
                 Ok(())
             }

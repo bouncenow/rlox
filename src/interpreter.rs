@@ -354,8 +354,8 @@ impl Interpreter {
                 }
             }
 
-            Expr::Variable { name, resolve_at } => {
-                let val = self.look_up_variable(name, *resolve_at)?;
+            Expr::Variable { v } => {
+                let val = self.look_up_variable(&v.name, v.resolve_at)?;
                 match val {
                     Some(v) => Ok(v),
                     None => Ok(ExprVal::Nil),

@@ -1,6 +1,5 @@
 use scan::*;
-use expression::Expr;
-use expression::ExprVal;
+use expression::*;
 use stmt::*;
 use util::RloxError;
 
@@ -296,8 +295,8 @@ impl<'a> ParserState<'a> {
         if self.match_next_one(TokenType::Equal) {
             let value = self.assignment()?;
 
-            return if let Expr::Variable { name, .. } = expr {
-                Ok(Expr::Assign { name, value: Box::new(value), resolve_at: None })
+            return if let Expr::Variable { v } = expr {
+                Ok(Expr::Assign { name: v.name, value: Box::new(value), resolve_at: None })
             } else if let Expr::Get { object, name } = expr {
                 Ok(Expr::Set { object, name, value: Box::new(value) })
             } else {
@@ -472,7 +471,7 @@ impl<'a> ParserState<'a> {
         }
 
         if self.match_next_one(TokenType::Identifier) {
-            return Ok(Expr::Variable { name: self.previous().clone(), resolve_at: None });
+            return Ok(Expr::Variable { v: Variable { name: self.previous().clone(), resolve_at: None }} );
         }
 
         Err(RloxError::new("Expect expression".to_string()))
