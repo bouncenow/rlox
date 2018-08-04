@@ -15,6 +15,7 @@ pub struct Resolver<> {
 enum FunctionType {
     Function,
     Method,
+    Initializer,
 }
 
 #[derive(Copy, Clone)]
@@ -67,7 +68,12 @@ impl Resolver {
                 };
 
                 for ref mut method in methods {
-                    self.resolve_function(&mut method.body, FunctionType::Method)?;
+                    let function_type = if method.name.lexeme == "init" {
+                        FunctionType::Initializer
+                    } else {
+                        FunctionType::Method
+                    };
+                    self.resolve_function(&mut method.body, function_type)?;
                 }
 
                 self.end_scope();
@@ -98,7 +104,12 @@ impl Resolver {
                     return Err("Cannot return from top-level code".to_string());
                 }
                 match value {
-                    Some(ref mut e) => self.resolve_expr(e),
+                    Some(ref mut e) => {
+                        if let Some(FunctionType::Initializer) = self.current_function_type {
+                            return Err("Cannot return a value from initializer".to_string());
+                        }
+                        self.resolve_expr(e)
+                    },
                     None => Ok(())
                 }
             }

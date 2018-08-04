@@ -52,7 +52,11 @@ impl RloxCallable for RloxFunction {
         if !self.is_initializer {
             result
         } else {
-            Ok(self.closure.borrow().get_at(0, "this").unwrap().unwrap())
+            if let Err(_) = result {
+                result
+            } else {
+                Ok(self.closure.borrow().get_at(0, "this").unwrap().unwrap())
+            }
         }
     }
 

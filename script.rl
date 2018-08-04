@@ -1,6 +1,7 @@
 class Person {
     init(name) {
         this.name = name;
+        return;
         this.age = 33;
     }
 
@@ -10,5 +11,6 @@ class Person {
 }
 
 var person = Person("John");
+person.age = 35;
 person.definition();
 print person.init("test");
