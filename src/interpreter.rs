@@ -307,6 +307,14 @@ impl Interpreter {
                             (ExprVal::String(l), ExprVal::String(r)) => {
                                 let concat = format!("{}{}", l, r);
                                 Ok(ExprVal::String(concat))
+                            },
+                            (ExprVal::Double(l), ExprVal::String(r)) => {
+                                let concat = format!("{}{}", l, r);
+                                Ok(ExprVal::String(concat))
+                            },
+                            (ExprVal::String(l), ExprVal::Double(r)) => {
+                                let concat = format!("{}{}", l, r);
+                                Ok(ExprVal::String(concat))
                             }
                             _ => Err(IError::Error("Expected operands to be strings or doubles".to_string()))
                         }
