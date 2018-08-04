@@ -16,7 +16,7 @@ pub struct RloxClass {
 
 impl RloxClass {
     pub fn new(name: Token, methods: HashMap<String, Rc<RloxFunction>>) -> RloxClass {
-        RloxClass {name, methods: Rc::new(methods) }
+        RloxClass { name, methods: Rc::new(methods) }
     }
 
     pub fn find_method(&self, name: &str, instance: Rc<RefCell<ClassInstance>>) -> Option<Rc<RloxFunction>> {
@@ -68,11 +68,25 @@ impl fmt::Display for ClassInstance {
 
 impl RloxCallable for RloxClass {
     fn call(&self, interpreter: &mut Interpreter, arguments: Vec<ExprVal>) -> Result<ExprVal, IError> {
-        Ok(ExprVal::ClassInstance(Rc::new(RefCell::new(ClassInstance::new(Rc::new(self.clone()))))))
+        let instance = Rc::new(
+            RefCell::new(
+                ClassInstance::new(
+                    Rc::new(self.clone())
+                )
+            )
+        );
+        if let Some(initializer) = self.methods.get("init") {
+            initializer.bind(Rc::clone(&instance)).call(interpreter, arguments)?;
+        }
+
+        Ok(ExprVal::ClassInstance(instance))
     }
 
     fn arity(&self) -> usize {
-        0
+        match self.methods.get("init") {
+            Some(i) => i.arity(),
+            None => 0
+        }
     }
 }
 

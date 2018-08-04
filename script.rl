@@ -1,10 +1,13 @@
-class Cake {
-  taste() {
-    var adjective = "delicious";
-    print "The " + this.flavor + " cake is " + adjective + "!";
-  }
+class Person {
+    init(name) {
+        this.name = name;
+        this.age = 33;
+    }
+
+    definition() {
+        print this.name + ", age: " + this.age;
+    }
 }
 
-var cake = Cake();
-cake.flavor = "German chocolate";
-cake.taste(); // Prints "The German chocolate cake is delicious!".
+var person = Person("John");
+person.definition();
