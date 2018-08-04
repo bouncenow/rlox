@@ -14,18 +14,19 @@ pub trait RloxCallable {
 
 pub struct RloxFunction {
     declaration: FunctionBody,
-    closure: Rc<RefCell<Environment>>
+    closure: Rc<RefCell<Environment>>,
+    is_initializer: bool
 }
 
 impl RloxFunction {
-    pub fn new(declaration: FunctionBody, closure: Rc<RefCell<Environment>>) -> RloxFunction {
-        RloxFunction { declaration, closure }
+    pub fn new(declaration: FunctionBody, closure: Rc<RefCell<Environment>>, is_initializer: bool) -> RloxFunction {
+        RloxFunction { declaration, closure, is_initializer }
     }
 
-    pub fn bind(&self, instance: Rc<RefCell<ClassInstance>>) -> RloxFunction {
+    pub fn bind(&self, instance: Rc<RefCell<ClassInstance>>, is_initializer: bool) -> RloxFunction {
         let mut env_with_this = Environment::new_with_enclosing(Rc::clone(&self.closure));
         env_with_this.define("this".to_string(), Some(ExprVal::ClassInstance(instance)));
-        RloxFunction::new(self.declaration.clone(), Rc::new(RefCell::new(env_with_this)))
+        RloxFunction::new(self.declaration.clone(), Rc::new(RefCell::new(env_with_this)), is_initializer)
     }
 }
 
@@ -37,7 +38,7 @@ impl RloxCallable for RloxFunction {
             func_env.borrow_mut().define(p.lexeme.clone(), Some(arguments[i].clone()));
         }
 
-        match interpreter.execute_block(&self.declaration.body, func_env) {
+        let result = match interpreter.execute_block(&self.declaration.body, func_env) {
             Err(IError::Return(value)) => {
                 Ok(value)
             },
@@ -46,6 +47,12 @@ impl RloxCallable for RloxFunction {
             }
             Err(e) => Err(e),
             _ => Ok(ExprVal::Nil)
+        };
+
+        if !self.is_initializer {
+            result
+        } else {
+            Ok(self.closure.borrow().get_at(0, "this").unwrap().unwrap())
         }
     }
 

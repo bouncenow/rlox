@@ -65,13 +65,13 @@ impl Environment {
         }
     }
 
-    fn get_at(&self, distance: usize, name: Token) -> IResult<Option<ExprVal>> {
+    pub fn get_at(&self, distance: usize, name: &str) -> IResult<Option<ExprVal>> {
         if distance > 0 {
             let ancestor_env = self.ancestor(distance);
             let ancestor_env_borrowed = ancestor_env.borrow();
-            Ok(ancestor_env_borrowed.get(&name.lexeme)?.clone())
+            Ok(ancestor_env_borrowed.get(name)?.clone())
         } else {
-            Ok(self.get(&name.lexeme as &str)?.clone())
+            Ok(self.get(name)?.clone())
         }
     }
 
@@ -207,7 +207,7 @@ impl Interpreter {
             }
 
             Stmt::Function { decl } => {
-                let function = RloxFunction::new(decl.body.clone(), Rc::clone(&self.current_env));
+                let function = RloxFunction::new(decl.body.clone(), Rc::clone(&self.current_env), false);
                 self.current_env.borrow_mut().define(decl.name.lexeme.clone(),
                                                                    Some(ExprVal::Callable(Rc::new(function))));
                 Ok(())
@@ -217,7 +217,8 @@ impl Interpreter {
 
                 let mut methods_with_names = HashMap::new();
                 for method_decl in methods.iter() {
-                    let method = Rc::new(RloxFunction::new(method_decl.body.clone(), Rc::clone(&self.current_env)));
+                    let is_initializer = method_decl.name.lexeme == "init";
+                    let method = Rc::new(RloxFunction::new(method_decl.body.clone(), Rc::clone(&self.current_env), is_initializer));
                     methods_with_names.insert(method_decl.name.lexeme.clone(), method);
                 }
 
@@ -389,7 +390,7 @@ impl Interpreter {
             }
 
             Expr::FunctionExpr { body } => {
-                let function = RloxFunction::new(body.clone(), Rc::clone(&self.current_env));
+                let function = RloxFunction::new(body.clone(), Rc::clone(&self.current_env), false);
                 Ok(ExprVal::Callable(Rc::new(function)))
             }
 
@@ -459,7 +460,7 @@ impl Interpreter {
 
     fn look_up_variable(&mut self, name: &Token, resolve_at: Option<usize>) -> IResult<Option<ExprVal>> {
         match resolve_at {
-            Some(d) => Ok(self.current_env.borrow().get_at(d, name.clone())?),
+            Some(d) => Ok(self.current_env.borrow().get_at(d, &name.lexeme)?),
             None => Ok(self.globals.borrow().get(&name.lexeme)?)
         }
     }

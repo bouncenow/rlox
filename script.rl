@@ -11,3 +11,4 @@ class Person {
 
 var person = Person("John");
 person.definition();
+print person.init("test");

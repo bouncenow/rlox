@@ -22,7 +22,7 @@ impl RloxClass {
     pub fn find_method(&self, name: &str, instance: Rc<RefCell<ClassInstance>>) -> Option<Rc<RloxFunction>> {
         match self.methods.get(name) {
             Some(f) => {
-                let bind_method = f.bind(instance);
+                let bind_method = f.bind(instance, name == "init");
                 Some(Rc::new(bind_method))
             }
             None => None,
@@ -76,7 +76,7 @@ impl RloxCallable for RloxClass {
             )
         );
         if let Some(initializer) = self.methods.get("init") {
-            initializer.bind(Rc::clone(&instance)).call(interpreter, arguments)?;
+            initializer.bind(Rc::clone(&instance), true).call(interpreter, arguments)?;
         }
 
         Ok(ExprVal::ClassInstance(instance))
