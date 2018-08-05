@@ -1,6 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::cell::RefCell;
 
 use scan::*;
@@ -11,12 +11,12 @@ use expression::*;
 #[derive(Clone)]
 pub struct RloxClass {
     pub name: Token,
-    pub methods: Rc<HashMap<String, Rc<RloxFunction>>>,
+    pub methods: Rc<FnvHashMap<String, Rc<RloxFunction>>>,
     pub superclass: Option<Rc<RloxClass>>,
 }
 
 impl RloxClass {
-    pub fn new(name: Token, methods: HashMap<String, Rc<RloxFunction>>, superclass: Option<Rc<RloxClass>>) -> RloxClass {
+    pub fn new(name: Token, methods: FnvHashMap<String, Rc<RloxFunction>>, superclass: Option<Rc<RloxClass>>) -> RloxClass {
         RloxClass { name, methods: Rc::new(methods), superclass }
     }
 
@@ -39,12 +39,12 @@ impl RloxClass {
 #[derive(Clone)]
 pub struct ClassInstance {
     pub class: Rc<RloxClass>,
-    pub fields: HashMap<String, ExprVal>,
+    pub fields: FnvHashMap<String, ExprVal>,
 }
 
 impl ClassInstance {
     fn new(class: Rc<RloxClass>) -> ClassInstance {
-        ClassInstance { class, fields: HashMap::new() }
+        ClassInstance { class, fields: FnvHashMap::default() }
     }
 
     pub fn get_instance_field(&self, name: &str) -> Option<ExprVal> {

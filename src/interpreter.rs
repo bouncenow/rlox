@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::fmt;
@@ -16,21 +16,21 @@ pub struct Interpreter {
 }
 
 pub struct Environment {
-    values: HashMap<String, Option<ExprVal>>,
+    values: FnvHashMap<String, Option<ExprVal>>,
     enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
     fn new_global() -> Environment {
         Environment {
-            values: HashMap::new(),
+            values: FnvHashMap::default(),
             enclosing: None,
         }
     }
 
     pub fn new_with_enclosing(enclosing: Rc<RefCell<Environment>>) -> Environment {
         Environment {
-            values: HashMap::new(),
+            values: FnvHashMap::default(),
             enclosing: Some(enclosing),
         }
     }
@@ -234,7 +234,7 @@ impl Interpreter {
                     Rc::clone(&self.current_env)
                 };
 
-                let mut methods_with_names = HashMap::new();
+                let mut methods_with_names = FnvHashMap::default();
                 for method_decl in methods.iter() {
                     let is_initializer = method_decl.name.lexeme == "init";
                     let method = Rc::new(RloxFunction::new(method_decl.body.clone(), Rc::clone(&methods_env), is_initializer));

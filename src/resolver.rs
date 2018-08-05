@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::mem;
 
 use stmt::*;
@@ -6,7 +6,7 @@ use scan::*;
 use expression::*;
 
 pub struct Resolver<> {
-    scopes: Vec<HashMap<String, bool>>,
+    scopes: Vec<FnvHashMap<String, bool>>,
     current_function_type: Option<FunctionType>,
     current_class_type: Option<ClassType>,
 }
@@ -292,7 +292,7 @@ impl Resolver {
     }
 
     fn begin_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(FnvHashMap::default());
     }
 
     fn end_scope(&mut self) {

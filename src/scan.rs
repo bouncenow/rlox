@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use util::ErrorWithPartialResult;
 use util::RloxError;
@@ -50,14 +50,14 @@ struct ScannerState {
     start: usize,
     current: usize,
     line: usize,
-    keywords: HashMap<&'static str, TokenType>,
+    keywords: FnvHashMap<&'static str, TokenType>,
     errors: Vec<String>
 }
 
 impl ScannerState {
 
     fn new(source: &str) -> ScannerState {
-        let keywords: HashMap<&'static str, TokenType> =
+        let keywords: FnvHashMap<&'static str, TokenType> =
             [
                 ("and", TokenType::And),
                 ("class", TokenType::Class),
