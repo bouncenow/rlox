@@ -22,6 +22,7 @@ pub enum Expr {
     Get { object: Box<Expr>, name: Token },
     Set { object: Box<Expr>, name: Token, value: Box<Expr> },
     This { keyword: Token, resolve_at: Option<usize> },
+    Super { keyword: Token, method: Token, resolve_at: Option<usize> },
 }
 
 #[derive(Debug, Clone)]

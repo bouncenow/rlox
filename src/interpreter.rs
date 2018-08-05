@@ -226,10 +226,18 @@ impl Interpreter {
                     None
                 };
 
+                let methods_env = if let Some(ref c) = superclass {
+                    let mut env_with_super = RefCell::new(Environment::new_with_enclosing(Rc::clone(&self.current_env)));
+                    env_with_super.borrow_mut().define("super".to_string(), Some(ExprVal::Class(Rc::clone(c))));
+                    Rc::new(env_with_super)
+                } else {
+                    Rc::clone(&self.current_env)
+                };
+
                 let mut methods_with_names = HashMap::new();
                 for method_decl in methods.iter() {
                     let is_initializer = method_decl.name.lexeme == "init";
-                    let method = Rc::new(RloxFunction::new(method_decl.body.clone(), Rc::clone(&self.current_env), is_initializer));
+                    let method = Rc::new(RloxFunction::new(method_decl.body.clone(), Rc::clone(&methods_env), is_initializer));
                     methods_with_names.insert(method_decl.name.lexeme.clone(), method);
                 }
 
@@ -446,17 +454,37 @@ impl Interpreter {
             }
 
             Expr::This { keyword, resolve_at } => {
-                let val = self.look_up_variable(keyword, *resolve_at)?;
+                let val = self.look_up_variable(&keyword.lexeme, *resolve_at)?;
                 match val {
                     Some(v) => Ok(v),
                     None => Ok(ExprVal::Nil),
+                }
+            }
+
+            Expr::Super { keyword, method: method_keyword, resolve_at } => {
+                let super_distance = resolve_at.unwrap();
+                let superclass = self.look_up_variable(&keyword.lexeme, *resolve_at)?.unwrap();
+                if let ExprVal::Class(sc) = superclass {
+                    let object = self.look_up_variable("this", Some(super_distance - 1))?.unwrap();
+                    if let ExprVal::ClassInstance(ci) = object {
+                        let method = sc.find_method(&method_keyword.lexeme, ci);
+                        if let Some(f) = method {
+                            Ok(ExprVal::Callable(f))
+                        } else {
+                            Err(IError::Error(format!("Undefined property: '{}'.", &method_keyword.lexeme)))
+                        }
+                    } else {
+                        panic!("'this' should be in the environment!")
+                    }
+                } else {
+                    panic!("superclass should be in the environment!")
                 }
             }
         }
     }
 
     fn evaluate_variable(&mut self, v: &Variable) -> IResult<ExprVal> {
-        let val = self.look_up_variable(&v.name, v.resolve_at)?;
+        let val = self.look_up_variable(&v.name.lexeme, v.resolve_at)?;
         match val {
             Some(v) => Ok(v),
             None => Ok(ExprVal::Nil),
@@ -477,10 +505,10 @@ impl Interpreter {
         }
     }
 
-    fn look_up_variable(&mut self, name: &Token, resolve_at: Option<usize>) -> IResult<Option<ExprVal>> {
+    fn look_up_variable(&mut self, name: &str, resolve_at: Option<usize>) -> IResult<Option<ExprVal>> {
         match resolve_at {
-            Some(d) => Ok(self.current_env.borrow().get_at(d, &name.lexeme)?),
-            None => Ok(self.globals.borrow().get(&name.lexeme)?)
+            Some(d) => Ok(self.current_env.borrow().get_at(d, name)?),
+            None => Ok(self.globals.borrow().get(name)?)
         }
     }
 }

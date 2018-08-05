@@ -66,6 +66,14 @@ impl Resolver {
 
                 self.define(name);
 
+                if let Some(_v) = superclass {
+                    self.begin_scope();
+                    match self.scopes.last_mut() {
+                        Some(s) => s.insert("super".to_string(), true),
+                        None => panic!("Scope stack should not be empty!")
+                    };
+                };
+
                 self.begin_scope();
                 match self.scopes.last_mut() {
                     Some(s) => s.insert("this".to_string(), true),
@@ -82,6 +90,10 @@ impl Resolver {
                 }
 
                 self.end_scope();
+
+                if let Some(_v) = superclass {
+                    self.end_scope();
+                }
 
                 self.current_class_type = enclosing;
                 Ok(())
@@ -215,6 +227,13 @@ impl Resolver {
 
             Expr::Unary { ref mut right, .. } => {
                 self.resolve_expr(right)
+            }
+
+            Expr::Super { keyword, ref mut resolve_at, .. } => {
+                if let Some(d) = self.resolve_local_distance(&keyword) {
+                    *resolve_at = Some(d);
+                }
+                Ok(())
             }
         }
     }

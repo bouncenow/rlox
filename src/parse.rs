@@ -480,6 +480,13 @@ impl<'a> ParserState<'a> {
             return Ok(Expr::Variable { v: Variable { name: self.previous().clone(), resolve_at: None }} );
         }
 
+        if self.match_next_one(TokenType::Super) {
+            let keyword = self.previous();
+            self.consume(TokenType::Dot, "Expect '.' after super")?;
+            let method = self.consume(TokenType::Identifier, "Expect superclass method name")?;
+            return Ok(Expr::Super { keyword, method, resolve_at: None });
+        }
+
         Err(RloxError::new("Expect expression".to_string()))
     }
 
