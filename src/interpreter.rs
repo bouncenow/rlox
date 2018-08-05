@@ -51,16 +51,16 @@ impl Environment {
         }
     }
 
-    fn assign(&mut self, name: Token, value: ExprVal) -> IResult<()> {
-        if self.values.contains_key(&name.lexeme) {
-            self.values.insert(name.lexeme, Some(value));
+    fn assign(&mut self, name: String, value: ExprVal) -> IResult<()> {
+        if self.values.contains_key(&name) {
+            self.values.insert(name, Some(value));
             Ok(())
         } else {
             match &self.enclosing {
                 Some(e) => {
                     e.borrow_mut().assign(name, value)
                 }
-                None => Err(IError::Error(format!("Undefined variable: {}.", &name.lexeme)))
+                None => Err(IError::Error(format!("Undefined variable: {}.", &name)))
             }
         }
     }
@@ -79,9 +79,9 @@ impl Environment {
         if distance > 0 {
             let ancestor_env = self.ancestor(distance);
             let mut ancestor_env_borrowed = ancestor_env.borrow_mut();
-            ancestor_env_borrowed.assign(name, value)
+            ancestor_env_borrowed.assign(name.lexeme.clone(), value)
         } else {
-            self.assign(name, value)
+            self.assign(name.lexeme.clone(), value)
         }
     }
 
@@ -382,7 +382,7 @@ impl Interpreter {
 
                 match resolve_at {
                     Some(d) => self.current_env.borrow_mut().assign_at(*d, name.clone(), value.clone())?,
-                    None => self.globals.borrow_mut().assign(name.clone(), value.clone())?
+                    None => self.globals.borrow_mut().assign(name.lexeme.clone(), value.clone())?
                 };
 
                 Ok(value.clone())
