@@ -56,9 +56,14 @@ impl Resolver {
                 self.resolve_function(&mut decl.body, FunctionType::Function)
             }
 
-            Stmt::Class { ref name, ref mut methods } => {
+            Stmt::Class { ref name, ref mut methods, ref mut superclass } => {
                 let enclosing = mem::replace(&mut self.current_class_type, Some(ClassType::Class));
                 self.declare(name)?;
+
+                if let Some(v) = superclass {
+                    self.resolve_variable(v)?;
+                }
+
                 self.define(name);
 
                 self.begin_scope();
@@ -147,16 +152,7 @@ impl Resolver {
     fn resolve_expr(&mut self, expr: &mut Expr) -> RResult<()> {
         match expr {
             Expr::Variable { ref mut v } => {
-                if let Some(s) = self.scopes.last() {
-                    if let Some(&false) = s.get(&v.name.lexeme) {
-                        return Err("Cannot read local variable in its own initializer.".to_string());
-                    }
-                }
-
-                if let Some(d) = self.resolve_local_distance(&v.name) {
-                    v.resolve_at = Some(d);
-                }
-                Ok(())
+                self.resolve_variable(v)
             }
 
             Expr::Assign { name, ref mut value, ref mut resolve_at } => {
@@ -221,6 +217,19 @@ impl Resolver {
                 self.resolve_expr(right)
             }
         }
+    }
+
+    fn resolve_variable(&mut self, v: &mut Variable) -> RResult<()> {
+        if let Some(s) = self.scopes.last() {
+            if let Some(&false) = s.get(&v.name.lexeme) {
+                return Err("Cannot read local variable in its own initializer.".to_string());
+            }
+        }
+
+        if let Some(d) = self.resolve_local_distance(&v.name) {
+            v.resolve_at = Some(d);
+        }
+        Ok(())
     }
 
     fn resolve_local_distance(&mut self, name: &Token) -> Option<usize> {

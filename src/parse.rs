@@ -80,6 +80,12 @@ impl<'a> ParserState<'a> {
 
     fn class_declaration(&mut self) -> ResStmt {
         let name = self.consume(TokenType::Identifier, "Expect class name.")?;
+        let superclass = if self.match_next_one(TokenType::Less) {
+            let name = self.consume(TokenType::Identifier, "Expect superclass name")?;
+            Some(Variable { name, resolve_at: None })
+        } else {
+            None
+        };
         self.consume(TokenType::LeftBrace, "Expect '{' after class name")?;
 
         let mut methods = Vec::new();
@@ -89,7 +95,7 @@ impl<'a> ParserState<'a> {
 
         self.consume(TokenType::RightBrace, "Expect '}' after class body")?;
 
-        Ok(Stmt::Class { name, methods })
+        Ok(Stmt::Class { name, methods, superclass })
     }
 
     fn function_decl_or_expr(&mut self) -> ResStmt {

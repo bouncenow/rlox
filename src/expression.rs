@@ -6,6 +6,7 @@ use scan::Token;
 use functions::RloxCallable;
 use stmt::FunctionBody;
 use class::ClassInstance;
+use class::RloxClass;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -35,6 +36,7 @@ pub enum ExprVal {
     Double(f64),
     Boolean(bool),
     Callable(Rc<RloxCallable>),
+    Class(Rc<RloxClass>),
     ClassInstance(Rc<RefCell<ClassInstance>>),
     Nil,
 }
@@ -47,6 +49,7 @@ impl fmt::Display for ExprVal {
             ExprVal::Boolean(b) => write!(f, "{}", b),
             &ExprVal::Nil => write!(f, "nil"),
             ExprVal::Callable(_) => write!(f, "callable <>"),
+            ExprVal::Class(cls) => write!(f, "class {}", cls),
             ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.borrow().class.name.lexeme)
         }
     }
@@ -72,6 +75,7 @@ impl fmt::Debug for ExprVal {
             ExprVal::Boolean(b) => write!(f, "{}", b),
             &ExprVal::Nil => write!(f, "nil"),
             ExprVal::Callable(_) => write!(f, "callable <>"),
+            ExprVal::Class(cls) => write!(f, "class {}", cls),
             ExprVal::ClassInstance(c) => write!(f, "instance of {}", &c.borrow().class.name.lexeme)
         }
     }

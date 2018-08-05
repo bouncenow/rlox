@@ -6,7 +6,7 @@ use scan::Token;
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Expression { expr: Expr },
-    Class { name: Token, methods: Vec<FunctionDecl> },
+    Class { name: Token, methods: Vec<FunctionDecl>, superclass: Option<Variable> },
     Function { decl: FunctionDecl },
     Print { expr: Expr },
     Var { name: Token, initializer: Option<Expr> },

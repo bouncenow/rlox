@@ -213,7 +213,18 @@ impl Interpreter {
                 Ok(())
             }
 
-            Stmt::Class { name, methods } => {
+            Stmt::Class { name, methods, superclass: superclass_variable } => {
+
+                let superclass = if let Some(s_v) = superclass_variable {
+                    let superclass = self.evaluate_variable(&s_v)?;
+                    if let ExprVal::Class(c) = superclass {
+                        Some(c)
+                    } else {
+                        return Err(IError::Error("Superclass must be a class".to_string()));
+                    }
+                } else {
+                    None
+                };
 
                 let mut methods_with_names = HashMap::new();
                 for method_decl in methods.iter() {
@@ -222,7 +233,7 @@ impl Interpreter {
                     methods_with_names.insert(method_decl.name.lexeme.clone(), method);
                 }
 
-                let class = ExprVal::Callable(Rc::new(RloxClass::new(name.clone(), methods_with_names)));
+                let class = ExprVal::Class(Rc::new(RloxClass::new(name.clone(), methods_with_names, superclass)));
                 self.current_env.borrow_mut().define(name.lexeme.clone(), Some(class));
                 Ok(())
             }
@@ -355,11 +366,7 @@ impl Interpreter {
             }
 
             Expr::Variable { v } => {
-                let val = self.look_up_variable(&v.name, v.resolve_at)?;
-                match val {
-                    Some(v) => Ok(v),
-                    None => Ok(ExprVal::Nil),
-                }
+                self.evaluate_variable(v)
             }
 
             Expr::Assign { name, value, resolve_at } => {
@@ -403,14 +410,18 @@ impl Interpreter {
                     args_evaluated.push(a_e);
                 }
 
-                if let ExprVal::Callable(c) = callee {
-                    if args_evaluated.len() == c.arity() {
-                        c.call(self, args_evaluated)
-                    } else {
-                        Err(IError::Error(format!("Expected {} arguments but got {}", c.arity(), args_evaluated.len())))
+                let callable_or_class = match callee {
+                    ExprVal::Callable(c) => c,
+                    ExprVal::Class(c) => c,
+                    _ => {
+                        return Err(IError::Error("Can only call functions and classes.".to_string()));
                     }
+                };
+
+                if args_evaluated.len() == callable_or_class.arity() {
+                    callable_or_class.call(self, args_evaluated)
                 } else {
-                    Err(IError::Error("Can only call functions and classes.".to_string()))
+                    Err(IError::Error(format!("Expected {} arguments but got {}", callable_or_class.arity(), args_evaluated.len())))
                 }
             }
 
@@ -441,6 +452,14 @@ impl Interpreter {
                     None => Ok(ExprVal::Nil),
                 }
             }
+        }
+    }
+
+    fn evaluate_variable(&mut self, v: &Variable) -> IResult<ExprVal> {
+        let val = self.look_up_variable(&v.name, v.resolve_at)?;
+        match val {
+            Some(v) => Ok(v),
+            None => Ok(ExprVal::Nil),
         }
     }
 

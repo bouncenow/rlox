@@ -12,11 +12,12 @@ use expression::*;
 pub struct RloxClass {
     pub name: Token,
     pub methods: Rc<HashMap<String, Rc<RloxFunction>>>,
+    pub superclass: Option<Rc<RloxClass>>,
 }
 
 impl RloxClass {
-    pub fn new(name: Token, methods: HashMap<String, Rc<RloxFunction>>) -> RloxClass {
-        RloxClass { name, methods: Rc::new(methods) }
+    pub fn new(name: Token, methods: HashMap<String, Rc<RloxFunction>>, superclass: Option<Rc<RloxClass>>) -> RloxClass {
+        RloxClass { name, methods: Rc::new(methods), superclass }
     }
 
     pub fn find_method(&self, name: &str, instance: Rc<RefCell<ClassInstance>>) -> Option<Rc<RloxFunction>> {
@@ -25,7 +26,12 @@ impl RloxClass {
                 let bind_method = f.bind(instance, name == "init");
                 Some(Rc::new(bind_method))
             }
-            None => None,
+            None => {
+                match self.superclass {
+                    Some(ref c) => c.find_method(name, instance),
+                    None => None
+                }
+            },
         }
     }
 }
