@@ -1,17 +1,9 @@
-class Doughnut {
-  cook() {
-    print "Fry until golden brown.";
-  }
-}
-
-class BostonCream < Doughnut {
+class Eclair < Box {
   cook() {
     super.cook();
-    print "Pipe full of custard and coat with chocolate.";
+    print "Pipe full of crème pâtissière.";
   }
 }
 
-BostonCream().cook();
-// Prints:
-// Fry until golden brown.
-// Pipe full of custard and coat with chocolate.
+var eclair = Eclair();
+eclair.cook();

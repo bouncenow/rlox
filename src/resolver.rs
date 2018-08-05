@@ -21,6 +21,7 @@ enum FunctionType {
 #[derive(Copy, Clone)]
 enum ClassType {
     Class,
+    Subclass,
 }
 
 type RResult<T> = Result<T, String>;
@@ -61,6 +62,7 @@ impl Resolver {
                 self.declare(name)?;
 
                 if let Some(v) = superclass {
+                    self.current_class_type = Some(ClassType::Subclass);
                     self.resolve_variable(v)?;
                 }
 
@@ -230,6 +232,11 @@ impl Resolver {
             }
 
             Expr::Super { keyword, ref mut resolve_at, .. } => {
+                if let None = self.current_class_type {
+                    return Err("Cannot use outside of a class".to_string());
+                } else if let Some(ClassType::Class) = self.current_class_type {
+                    return Err("Cannot use outside of a subclass".to_string());
+                }
                 if let Some(d) = self.resolve_local_distance(&keyword) {
                     *resolve_at = Some(d);
                 }
